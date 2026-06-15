@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BrowserSync — Settings</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+      fieldset { margin-bottom: 1rem; }
+      label { display: block; margin: .25rem 0; }
+    </style>
+  </head>
+  <body>
+    <h1>BrowserSync</h1>
+    <p><em>Scaffold UI — controls are not wired yet (see docs/PLAN.md).</em></p>
+
+    <fieldset>
+      <legend>Transport</legend>
+      <label><input type="radio" name="transport" value="localAgent" checked /> Local agent (file / NFS / SMB / cloud folder)</label>
+      <label><input type="radio" name="transport" value="remoteServer" /> Self-hosted server</label>
+      <label><input type="radio" name="transport" value="browserStorage" /> Browser storage.sync (demo only)</label>
+      <label>Agent URL / Server URL: <input id="baseUrl" type="text" value="http://127.0.0.1:8787" /></label>
+      <label>Token: <input id="token" type="password" /></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>What to sync</legend>
+      <label><input type="checkbox" id="syncBookmarks" checked /> Bookmarks</label>
+      <label><input type="checkbox" id="syncTabs" checked /> Open tabs</label>
+      <label><input type="checkbox" id="syncHistory" checked /> History</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Device</legend>
+      <label>Device name: <input id="deviceName" type="text" placeholder="e.g. laptop-firefox" /></label>
+    </fieldset>
+
+    <button id="syncNow">Sync now</button>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "name": "browsersync-agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Local sync agent / self-hosted server for BrowserSync (scaffold).",
+  "bin": { "browsersync-agent": "index.js" },
+  "scripts": {
+    "start": "node index.js"
+  }
+}

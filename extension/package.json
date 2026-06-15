@@ -1,0 +1,19 @@
+{
+  "name": "browsersync-extension",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Cross-browser bookmarks/tabs/history sync (scaffold).",
+  "scripts": {
+    "build:chrome": "echo 'TODO(M1): esbuild bundle + copy manifest.chrome.json -> dist/manifest.json'",
+    "build:firefox": "echo 'TODO(M1): esbuild bundle + copy manifest.firefox.json -> dist/manifest.json'",
+    "test": "echo 'TODO(M2): unit tests for merge/collectors/appliers'"
+  },
+  "dependencies": {
+    "webextension-polyfill": "^0.12.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0",
+    "web-ext": "^8.0.0"
+  }
+}
