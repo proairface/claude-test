@@ -7,19 +7,23 @@ implementation with tests, **not** wall-clock.
 ## M0 — Scaffold + design ✅ (this commit)
 Repo structure, module interfaces, manifests, docs. No logic.
 
-## M1 — Build & dev harness  (~0.5 day)
-- `npm` scripts to build `dist/` for Chrome and Firefox (manifest swap + bundle).
-- `web-ext run` for Firefox, load-unpacked for Chromium.
-- Wire `webextension-polyfill`.
-- **Done when:** the empty extension loads in both browser families and logs
-  from its service worker.
+## M1 — Build & dev harness ✅ (done)
+- `npm run build` (esbuild) emits `dist/chrome/` and `dist/firefox/` with the
+  right manifest each; `npm run run:firefox` launches via `web-ext`.
+- `webextension-polyfill` wired through `src/lib/browser.js`.
+- **Done:** both targets build and the background worker bundles cleanly.
 
-## M2 — Bookmarks two-way sync  (~1.5 days)
-- `collectors/bookmarks.js`, `appliers/bookmarks.js`.
-- Path-based reconciliation (recreate folder hierarchy), content-hash ids.
-- Engine + merge + an in-memory transport for unit tests.
-- **Done when:** add a bookmark in Firefox, run sync, it appears in Brave under
-  the same folder; deletes propagate; re-running sync is a no-op (idempotent).
+## M2 — Bookmarks two-way sync ✅ (done)
+- `collectors/bookmarks.js`, `appliers/bookmarks.js` (cross-browser root-role
+  mapping in `model/roots.js`), content-hash ids in `model/records.js`.
+- CRDT merge (`sync/merge.js`) + engine (`sync/engine.js`) with Lamport clocks,
+  baseline-based change/delete detection, and ETag retry.
+- In-memory transport (`transport/memoryAdapter.js`) + 15 unit tests
+  (`npm test`) covering create/idempotency/delete/no-resurrection/convergence.
+- **Done when (manual):** add a bookmark in Firefox, run sync, it appears in
+  Brave under the same folder; deletes propagate; re-sync is a no-op. The
+  automated tests prove the engine/merge half; manual cross-browser verification
+  needs the M3 agent (or the memory adapter wired temporarily).
 
 ## M3 — Local sync agent + file transport  (~1.5 days)
 - `agent/` daemon: HTTP on `127.0.0.1`, reads/writes a configurable file path,

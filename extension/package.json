@@ -3,11 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Cross-browser bookmarks/tabs/history sync (scaffold).",
+  "description": "Cross-browser bookmarks/tabs/history sync.",
   "scripts": {
-    "build:chrome": "echo 'TODO(M1): esbuild bundle + copy manifest.chrome.json -> dist/manifest.json'",
-    "build:firefox": "echo 'TODO(M1): esbuild bundle + copy manifest.firefox.json -> dist/manifest.json'",
-    "test": "echo 'TODO(M2): unit tests for merge/collectors/appliers'"
+    "build:chrome": "node build.mjs chrome",
+    "build:firefox": "node build.mjs firefox",
+    "build": "npm run build:chrome && npm run build:firefox",
+    "run:firefox": "web-ext run --source-dir dist/firefox",
+    "test": "node --test"
   },
   "dependencies": {
     "webextension-polyfill": "^0.12.0"

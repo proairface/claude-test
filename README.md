@@ -5,10 +5,14 @@ A cross-browser extension that synchronizes **bookmarks**, **open tabs**, and
 Edge, Chromium). Synced entries are written back using each browser's native
 APIs, so the browser treats imported activity the same as local activity.
 
-> **Status: scaffold + design only.** This commit lays out the repository
-> structure, module interfaces, and the build plan. No sync logic is
-> implemented yet — every module is a documented stub with `TODO`s. Review the
-> plan in [`docs/PLAN.md`](docs/PLAN.md) before implementation begins.
+> **Status: M1 + M2 implemented.** The build harness works and bookmarks
+> two-way sync is functional with a tested CRDT sync engine (15 passing unit
+> tests). Tabs (M4) and history (M5) and the local agent (M3) are still stubs.
+> See [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
+>
+> Dev quickstart (from `extension/`): `npm install`, `npm test`,
+> `npm run build` → load `dist/chrome` (chrome://extensions, unpacked) or
+> `npm run run:firefox`.
 
 ## What works vs. what's constrained
 
