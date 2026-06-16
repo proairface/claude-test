@@ -1,31 +1,32 @@
 #!/usr/bin/env node
-// BrowserSync local sync agent — SCAFFOLD (milestone M3).
+// BrowserSync local sync agent — entry point.
 //
-// Planned behavior:
-//   - Bind an HTTP server to 127.0.0.1:${PORT}.
-//   - GET  /health -> { ok: true, version }
-//   - GET  /state  -> read SYNC_FILE, return JSON + ETag (hash of contents).
-//   - PUT  /state  -> validate If-Match against current ETag; on match,
-//                     atomically write SYNC_FILE (write temp + rename); else 412.
-//   - Require header `Authorization: Bearer ${TOKEN}` on every request.
-//   - SYNC_FILE may live on any mount (local/NFS/SMB) or a cloud-synced folder.
+// Starts the HTTP server (see server.js) bound to 127.0.0.1, serving the shared
+// sync state from SYNC_FILE. Point SYNC_FILE at any mount (local/NFS/SMB) or a
+// cloud-synced folder (Drive/OneDrive/Dropbox) to sync across machines.
 //
-// Implemented in M3. Today it only prints its intended config so the scaffold
-// is runnable and self-documenting.
-
+//   PORT       localhost port            (default 8787)
+//   SYNC_FILE  path to the sync file     (default ./state.json)
+//   TOKEN      shared secret             (required in practice; warns if unset)
 import process from "node:process";
+import { resolve } from "node:path";
+import { createAgentServer, AGENT_VERSION } from "./server.js";
 
-const config = {
-  port: process.env.PORT ?? "8787",
-  syncFile: process.env.SYNC_FILE ?? "./state.json",
-  hasToken: Boolean(process.env.TOKEN),
-};
+const port = Number(process.env.PORT ?? 8787);
+const syncFile = resolve(process.env.SYNC_FILE ?? "./state.json");
+const token = process.env.TOKEN;
 
-console.log("[browsersync-agent] scaffold — not yet serving requests (M3).");
-console.log("[browsersync-agent] planned config:", config);
-if (!config.hasToken) {
-  console.warn("[browsersync-agent] WARNING: TOKEN not set; required in M3.");
+if (!token) {
+  console.warn("[browsersync-agent] WARNING: TOKEN is unset — the agent is unauthenticated.");
 }
 
-// TODO(M3): create the http.Server, wire the routes above with atomic writes
-// and ETag concurrency, and add graceful shutdown.
+const server = createAgentServer({ syncFile, token });
+
+server.listen(port, "127.0.0.1", () => {
+  console.log(`[browsersync-agent] v${AGENT_VERSION} listening on http://127.0.0.1:${port}`);
+  console.log(`[browsersync-agent] sync file: ${syncFile}`);
+});
+
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, () => server.close(() => process.exit(0)));
+}

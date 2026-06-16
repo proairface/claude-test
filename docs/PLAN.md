@@ -25,13 +25,20 @@ Repo structure, module interfaces, manifests, docs. No logic.
   automated tests prove the engine/merge half; manual cross-browser verification
   needs the M3 agent (or the memory adapter wired temporarily).
 
-## M3 — Local sync agent + file transport  (~1.5 days)
-- `agent/` daemon: HTTP on `127.0.0.1`, reads/writes a configurable file path,
-  ETag concurrency, token auth.
-- `transport/localAgentAdapter.js` in the extension.
-- Options UI to set the path (point it at NFS/SMB/local/Drive/OneDrive folder).
-- **Done when:** two browsers on the same machine sync bookmarks through a file
-  on disk; pointing the path at a cloud-synced folder syncs across machines.
+## M3 — Local sync agent + file transport ✅ (done)
+- `agent/` daemon (`server.js` + `index.js`, Node builtins only): HTTP on
+  `127.0.0.1`, `GET/PUT /state` reading/writing a configurable `SYNC_FILE` with
+  atomic writes, ETag optimistic concurrency, and bearer-token auth.
+- `transport/localAgentAdapter.js` implemented (maps 412 -> ConcurrencyError;
+  the engine's retry loop handles conflicts).
+- 7 new tests: agent auth/health/round-trip/412, plus a full **end-to-end**
+  two-device sync through the real agent + adapter + a real file on disk.
+- **Done when (manual):** run the agent, point two browsers' extensions at it,
+  and a bookmark crosses over; point `SYNC_FILE` at a cloud-synced folder to
+  sync across machines. Automated e2e covers the transport; the remaining step
+  is loading the built extension in two real browsers.
+- Still TODO (small): options-page field already exists for the agent URL/token;
+  a per-path picker UI is a nicety, not required.
 
 ## M4 — Open tabs sync  (~1 day)
 - `collectors/tabs.js`, `appliers/tabs.js`, per-device tab sets.
@@ -51,6 +58,21 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - Conflict/perf: large-history delta sync (`/changes?since=`), tombstone GC.
 - Packaging: signed `.xpi` (Firefox) and store-ready zip (Chromium), native
   messaging host manifests + installers per OS for the agent.
+
+### M6 (optional) — Chromium past-dated history via the agent
+The Chromium `history.addUrl` API can't set a past timestamp, so synced visits
+are stamped at sync time there (documented limitation we deliberately accepted).
+If true retroactive timestamps on Chromium are later wanted, the realistic path
+is to extend the **local agent** (Python is a fine choice — `import sqlite3`)
+to write directly into Chromium's `History` SQLite file:
+- Runs as the existing external local process, not from the extension sandbox
+  (a webpage/extension JS can never reach the profile DB).
+- **Must write only while that browser is fully closed** — Chromium locks the
+  DB while running; concurrent writes risk corruption / "database is locked".
+- Hand-maintains Chromium's schema (`urls`, `visits`, visit sources, segments,
+  favicons) and WAL/caches, which change across versions — inherently fragile.
+This stays **opt-in and off by default**; it does not affect Firefox, which
+already sets real `visitTime` natively.
 
 ## Effort summary
 

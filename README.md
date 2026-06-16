@@ -5,14 +5,19 @@ A cross-browser extension that synchronizes **bookmarks**, **open tabs**, and
 Edge, Chromium). Synced entries are written back using each browser's native
 APIs, so the browser treats imported activity the same as local activity.
 
-> **Status: M1 + M2 implemented.** The build harness works and bookmarks
-> two-way sync is functional with a tested CRDT sync engine (15 passing unit
-> tests). Tabs (M4) and history (M5) and the local agent (M3) are still stubs.
-> See [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
+> **Status: M1 + M2 + M3 implemented.** Build harness, bookmarks two-way sync
+> (tested CRDT engine), and the local sync agent + file transport all work —
+> 22 passing tests including a real end-to-end two-device sync through the
+> agent. Tabs (M4) and history (M5) are still stubs. See
+> [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
 >
-> Dev quickstart (from `extension/`): `npm install`, `npm test`,
-> `npm run build` → load `dist/chrome` (chrome://extensions, unpacked) or
-> `npm run run:firefox`.
+> **Try it locally:**
+> 1. Agent (from `agent/`): `TOKEN=yoursecret SYNC_FILE=~/Drive/bsync.json node index.js`
+>    (point `SYNC_FILE` at any local/NFS/SMB path or cloud-synced folder).
+> 2. Extension (from `extension/`): `npm install && npm test && npm run build`,
+>    then load `dist/chrome` (chrome://extensions → unpacked) or
+>    `npm run run:firefox`. In the extension's Options, set the agent URL +
+>    token and click **Sync now**.
 
 ## What works vs. what's constrained
 
