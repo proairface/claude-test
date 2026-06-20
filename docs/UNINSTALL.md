@@ -8,6 +8,7 @@ cleanly. This page lists **everything** it touches and how to remove it.
 | What | Where | Created by |
 | --- | --- | --- |
 | Project code + `node_modules` + `dist/` | your clone folder (e.g. `~/browsersync`) | `git clone` + `npm install` + build |
+| `.node/` (only if Node was auto-installed) | inside the project | `setup.sh` project-local Node download (no sudo) |
 | `agent/browsersync.env`, `agent/run-agent.sh` | inside the project | `setup.sh` |
 | `agent/state.json` (or your chosen sync file) | wherever `SYNC_FILE` points (can be a cloud folder) | the agent, at runtime — **this is your data** |
 | Agent process | a foreground `node` process you start yourself | you, via the launcher |

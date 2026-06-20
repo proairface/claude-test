@@ -11,7 +11,8 @@ APIs, so the browser treats imported activity the same as local activity.
 > agent. Tabs (M4) and history (M5) are still stubs. See
 > [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
 >
-> **Easiest start — the setup script** clones/updates the repo, installs deps,
+> **Easiest start — the setup script** clones/updates the repo, installs deps
+> (and, if Node 18+ isn't found, offers a no-sudo project-local Node download),
 > builds both targets, and configures + optionally starts the agent:
 > ```bash
 > ./setup.sh            # interactive; or run from a fresh download to bootstrap
