@@ -44,6 +44,9 @@ export async function runSyncCycle(deps) {
   const baseline = await store.getBaseline();
   const storedLamport = await store.getLamport();
 
+  // Optional transport preflight (e.g. agent/server protocol-compatibility check).
+  if (typeof transport.preflight === "function") await transport.preflight();
+
   // 1. Snapshot current local reality.
   const items = await collect();
   /** @type {Record<string,string>} */

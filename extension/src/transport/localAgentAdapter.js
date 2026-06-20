@@ -3,6 +3,7 @@
 // agent owns the filesystem; the extension just calls HTTP. The remote
 // self-hosted server (M6) speaks the same protocol, so it reuses this logic.
 import { ConcurrencyError } from "./adapter.js";
+import { isProtocolCompatible, ProtocolMismatchError, PROTOCOL_VERSION } from "../model/version.js";
 
 /**
  * @param {{ baseUrl?: string, token?: string }} [opts]
@@ -13,6 +14,24 @@ export function createLocalAgentAdapter({ baseUrl = "http://127.0.0.1:8787", tok
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   return {
+    // Verify the agent is reachable, authorized, and protocol-compatible before
+    // syncing — so a stale agent/extension fails with a clear message instead of
+    // misbehaving mid-cycle.
+    async preflight() {
+      let res;
+      try {
+        res = await fetch(`${base}/health`, { headers: authHeaders });
+      } catch {
+        throw new Error(`Sync agent/server not reachable at ${base}`);
+      }
+      if (res.status === 401) throw new Error("Sync agent/server rejected the token (401)");
+      if (!res.ok) throw new Error(`Sync agent/server health check failed: ${res.status}`);
+      const info = await res.json().catch(() => ({}));
+      if (!isProtocolCompatible(info.protocol)) {
+        throw new ProtocolMismatchError(info.protocol, PROTOCOL_VERSION, base);
+      }
+    },
+
     async pull() {
       const res = await fetch(`${base}/state`, { headers: authHeaders });
       if (!res.ok) throw new Error(`agent pull failed: ${res.status}`);

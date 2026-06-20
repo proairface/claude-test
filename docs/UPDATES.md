@@ -54,6 +54,40 @@ new version.
 `isProtocolCompatible()` compares the protocol major and can warn on a mismatch
 rather than failing obscurely. Unknown/legacy agents are not blocked.
 
+## The agent / self-hosted server
+
+The agent (and the identical self-hosted server) is a **separate download** with
+its own lifecycle, distinct from the store-distributed extension.
+
+### Updating it
+- **Local agent:** `git pull` in the repo, then restart it (Ctrl-C the running
+  process and re-run `agent/run-agent.sh`, or your service manager). Each machine
+  runs its own agent and is updated independently.
+- **Self-hosted server:** deploy the new `agent/` build to your host and restart.
+
+### Why agent updates are low-risk
+The agent is **schema-agnostic**: it only stores and serves the opaque
+sync-state blob — it never parses records. So:
+- The **data** cross-version guard (`assertStateWritable`) is enforced entirely
+  in the *extension*, and therefore protects the agent/server path too, on every
+  transport.
+- Agents on different machines can run **different versions** safely, as long as
+  each is wire-protocol-compatible with the extension talking to it locally.
+
+### Handling a wire-protocol mismatch
+The only agent/extension contract that can break is the HTTP wire protocol
+(`GET/PUT /state`, ETag, auth). It's guarded end to end:
+- The agent advertises `protocol` on `GET /health`.
+- Before each sync, the agent/server adapter runs a **preflight**: it checks the
+  agent is reachable, the token is accepted, and the protocol major matches. On
+  mismatch it throws `ProtocolMismatchError` ("update whichever is older");
+  unreachable/401 produce equally clear messages. The sync is aborted *before*
+  any write, so a mismatch can never half-apply.
+- Bump `PROTOCOL_VERSION` in **both** `agent/server.js` and
+  `extension/src/model/version.js` only on an incompatible protocol change, and
+  prefer additive, backward-compatible protocol changes so old and new can
+  coexist during rollout.
+
 ## Release checklist (when cutting a version)
 
 1. Bump `manifest.*.json` `version`.

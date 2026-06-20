@@ -49,3 +49,16 @@ export function isProtocolCompatible(remoteProtocol) {
   if (!Number.isFinite(v)) return true; // unknown/legacy agent: don't block
   return Math.trunc(v) === PROTOCOL_VERSION;
 }
+
+/** Thrown when the agent/server speaks an incompatible wire-protocol major. */
+export class ProtocolMismatchError extends Error {
+  constructor(found, supported, where) {
+    super(
+      `The sync agent/server${where ? ` at ${where}` : ""} speaks protocol v${found}, ` +
+        `but this extension speaks v${supported}. Update whichever is older.`,
+    );
+    this.name = "ProtocolMismatchError";
+    this.found = found;
+    this.supported = supported;
+  }
+}
