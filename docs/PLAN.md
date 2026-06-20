@@ -82,6 +82,17 @@ Repo structure, module interfaces, manifests, docs. No logic.
   near-instant updates come from the change-driven option, not tiny polling.
 - 5 new tests. 38 total.
 
+## M4.6 — Update & version safety ✅ (done)
+- Web stores are the intended channel (browsers auto-update). See
+  `docs/UPDATES.md` for the full policy.
+- **Cross-version guard:** the sync state carries a major `version`; a device
+  refuses to overwrite state from a newer schema major (`assertStateWritable` →
+  `IncompatibleStateError`) so an out-of-date device can't clobber newer data.
+- **Config migrations:** `migrateConfig` (pure, tested) + `runConfigMigrations`
+  on `onInstalled(update)`.
+- **Protocol version:** agent `/health` reports `protocol`; `isProtocolCompatible`
+  in the extension. 6 new tests. 44 total.
+
 ## M5 — History sync  (~1.5 days)
 - `collectors/history.js`, `appliers/history.js` with capability branching.
 - Firefox: real `visitTime`. Chromium: documented current-time stamping.

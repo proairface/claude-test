@@ -15,6 +15,7 @@ import { applyTabs } from "../appliers/tabs.js";
 import { createStore } from "../state/store.js";
 import { createTransport } from "../transport/index.js";
 import { periodForConfig } from "../sync/schedule.js";
+import { runConfigMigrations } from "../state/migrate.js";
 
 const SYNC_ALARM = "browsersync:cycle";
 const CONFIG_KEY = "browsersync:config";
@@ -113,10 +114,11 @@ async function applyAlarm() {
 }
 
 // --- wiring -----------------------------------------------------------------
-browser.runtime.onInstalled.addListener(async () => {
+browser.runtime.onInstalled.addListener(async (details) => {
+  if (details?.reason === "update" || details?.reason === "install") await runConfigMigrations();
   await createStore("bookmark").getDeviceId();
   await applyAlarm();
-  console.log("[BrowserSync] installed.");
+  console.log(`[BrowserSync] ${details?.reason ?? "ready"}.`);
 });
 browser.runtime.onStartup?.addListener(applyAlarm);
 

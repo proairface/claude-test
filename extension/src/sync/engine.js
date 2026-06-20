@@ -8,6 +8,7 @@
 import { makeRecord, stableStringify } from "../model/records.js";
 import { mergeState } from "./merge.js";
 import { ConcurrencyError } from "../transport/adapter.js";
+import { STATE_SCHEMA_VERSION, assertStateWritable } from "../model/version.js";
 
 function maxLamport(...maps) {
   let m = 0;
@@ -52,6 +53,8 @@ export async function runSyncCycle(deps) {
   // 2..5 wrapped so an optimistic-concurrency conflict can re-pull and retry.
   for (let attempt = 0; ; attempt++) {
     const pulled = await transport.pull();
+    // Cross-version safety: never overwrite state from a newer schema major.
+    assertStateWritable(pulled.state);
     const allRemote = pulled.state?.records ?? {};
 
     // Split the shared state into our type (to merge) and everything else
@@ -99,7 +102,7 @@ export async function runSyncCycle(deps) {
 
     try {
       await transport.push(
-        { version: 1, records: { ...otherTypes, ...merged }, updatedAt: Date.now() },
+        { version: STATE_SCHEMA_VERSION, records: { ...otherTypes, ...merged }, updatedAt: Date.now() },
         pulled.etag,
       );
     } catch (err) {
