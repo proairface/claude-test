@@ -57,10 +57,19 @@ Repo structure, module interfaces, manifests, docs. No logic.
   `fetch`); the agent binary and a future cloud/OAuth module stay separate
   downloads, never part of the store package.
 
-## M4 — Open tabs sync  (~1 day)
-- `collectors/tabs.js`, `appliers/tabs.js`, per-device tab sets.
-- Options: "show other devices' tabs" (list) vs. "restore on demand".
-- **Done when:** open tabs from each device are visible/restorable elsewhere.
+## M4 — Open tabs sync ✅ (done)
+- `collectors/tabs.js` (per-device tab snapshot, owner-scoped ids) and
+  `appliers/tabs.js` (list-only: never auto-opens; `restoreTabs` for explicit
+  user action).
+- Engine generalized: **type isolation** (a cycle only touches its own record
+  type, passing others through) and an **`owns` predicate** so a device only
+  tombstones its own tabs — closing a tab never deletes another device's tabs.
+- Background syncs all enabled types; caches other devices' tabs for the
+  options page, which lists them as clickable links ("restore on demand").
+- 3 new tests (per-device coexistence, owner-scoped close, bookmark/tab type
+  isolation). 33 tests total.
+- **Done when (manual):** open tabs on each device are listed in the others'
+  options page and openable on demand.
 
 ## M5 — History sync  (~1.5 days)
 - `collectors/history.js`, `appliers/history.js` with capability branching.

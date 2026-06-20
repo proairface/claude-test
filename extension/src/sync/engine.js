@@ -20,7 +20,9 @@ function maxLamport(...maps) {
 }
 
 /**
- * Run a full sync cycle for one record type (bookmarks in M2).
+ * Run a full sync cycle for ONE record type. The shared sync state may hold
+ * several types (bookmarks, tabs, …); this cycle only touches records of its
+ * own `type` and passes the rest through untouched.
  *
  * @param {object} deps
  * @param {import("../transport/adapter.js").TransportAdapter} deps.transport
@@ -28,10 +30,15 @@ function maxLamport(...maps) {
  * @param {(records: import("../model/records.js").Record[]) => Promise<void>} deps.apply
  * @param {object} deps.store   persistence (see state/store.js)
  * @param {string} [deps.type]  record type, default "bookmark"
+ * @param {(rec: import("../model/records.js").Record, deviceId: string) => boolean} [deps.owns]
+ *   Whether a baseline record's local presence is THIS device's responsibility.
+ *   Defaults to true (shared sets like bookmarks). For per-device sets like
+ *   tabs, only the owning device may tombstone its own entries — so a device
+ *   never deletes another device's tabs just because it doesn't have them open.
  * @returns {Promise<{applied:number,total:number}>}
  */
 export async function runSyncCycle(deps) {
-  const { transport, collect, apply, store, type = "bookmark" } = deps;
+  const { transport, collect, apply, store, type = "bookmark", owns = () => true } = deps;
   const deviceId = await store.getDeviceId();
   const baseline = await store.getBaseline();
   const storedLamport = await store.getLamport();
@@ -45,9 +52,20 @@ export async function runSyncCycle(deps) {
   // 2..5 wrapped so an optimistic-concurrency conflict can re-pull and retry.
   for (let attempt = 0; ; attempt++) {
     const pulled = await transport.pull();
-    const remote = pulled.state?.records ?? {};
+    const allRemote = pulled.state?.records ?? {};
 
-    const tick = Math.max(storedLamport, maxLamport(baseline, remote)) + 1;
+    // Split the shared state into our type (to merge) and everything else
+    // (to preserve verbatim on push).
+    /** @type {Record<string, import("../model/records.js").Record>} */
+    const remote = {};
+    /** @type {Record<string, import("../model/records.js").Record>} */
+    const otherTypes = {};
+    for (const [id, rec] of Object.entries(allRemote)) {
+      if ((rec.type ?? "bookmark") === type) remote[id] = rec;
+      else otherTypes[id] = rec;
+    }
+
+    const tick = Math.max(storedLamport, maxLamport(baseline, allRemote)) + 1;
 
     // Reconstruct this device's view of every item, reusing baseline lamports
     // for things that haven't changed locally since last cycle.
@@ -61,9 +79,11 @@ export async function runSyncCycle(deps) {
         ? base
         : makeRecord({ id: it.id, type, deviceId, lamport: tick, payload: it.payload });
     }
-    // Local deletes: items that were live in the baseline but are gone now.
+    // Local deletes: items that were live in the baseline but are gone now —
+    // restricted to records this device owns (see `owns`).
     for (const [id, rec] of Object.entries(baseline)) {
       if (rec.deleted || liveLocalHashes[id] !== undefined) continue;
+      if (!owns(rec, deviceId)) continue;
       local[id] = makeRecord({
         id,
         type: rec.type,
@@ -79,7 +99,7 @@ export async function runSyncCycle(deps) {
 
     try {
       await transport.push(
-        { version: 1, records: merged, updatedAt: Date.now() },
+        { version: 1, records: { ...otherTypes, ...merged }, updatedAt: Date.now() },
         pulled.etag,
       );
     } catch (err) {
@@ -88,7 +108,7 @@ export async function runSyncCycle(deps) {
     }
 
     await store.setLamport(tick);
-    await store.setBaseline(merged);
+    await store.setBaseline(merged); // baseline holds only this type's records
     return { applied: toApply.length, total: Object.keys(merged).length };
   }
 }
