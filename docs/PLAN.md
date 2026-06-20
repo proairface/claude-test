@@ -71,6 +71,17 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - **Done when (manual):** open tabs on each device are listed in the others'
   options page and openable on demand.
 
+## M4.5 — Configurable auto-sync scheduling ✅ (done)
+- Options: enable/disable auto-sync, a numeric interval (seconds/minutes), and
+  "sync right after a local change" (debounced event-driven).
+- Background: a single **coalescing lock** (`inFlight`) ensures runs never
+  overlap/pile up; the periodic alarm is rebuilt from config on change; bookmark
+  and tab change listeners trigger a debounced sync.
+- `sync/schedule.js` (pure, tested) converts the interval to alarm minutes with
+  a floor. Honest note in the UI: Chrome clamps sub-minute alarms to ~1 min;
+  near-instant updates come from the change-driven option, not tiny polling.
+- 5 new tests. 38 total.
+
 ## M5 — History sync  (~1.5 days)
 - `collectors/history.js`, `appliers/history.js` with capability branching.
 - Firefox: real `visitTime`. Chromium: documented current-time stamping.

@@ -45,6 +45,23 @@
     </fieldset>
 
     <fieldset>
+      <legend>When to sync</legend>
+      <label><input type="checkbox" id="autoSync" checked /> Sync automatically on a schedule</label>
+      <div class="group" id="intervalGroup">
+        <label>Every
+          <input id="intervalValue" type="number" min="1" step="1" value="5" style="width:5rem" />
+          <select id="intervalUnit">
+            <option value="minutes">minutes</option>
+            <option value="seconds">seconds</option>
+          </select>
+        </label>
+        <p class="hint">Chrome rounds intervals under 1 minute up to ~1 minute; Firefox allows shorter. For
+          near-instant updates use the option below instead of a tiny interval.</p>
+      </div>
+      <label><input type="checkbox" id="syncOnChange" checked /> Also sync right after I add/remove a bookmark or tab <span class="hint">(debounced)</span></label>
+    </fieldset>
+
+    <fieldset>
       <legend>Other devices' open tabs</legend>
       <div id="remoteTabs"><p class="hint">Enable "Open tabs" and sync to see tabs from your other devices here.</p></div>
     </fieldset>
