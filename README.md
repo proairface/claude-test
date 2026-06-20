@@ -11,7 +11,8 @@ APIs, so the browser treats imported activity the same as local activity.
 > agent. Tabs (M4) and history (M5) are still stubs. See
 > [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
 >
-> **Try it locally:**
+> **Try it:** see [`docs/TRY-IT.md`](docs/TRY-IT.md) for a full local
+> walkthrough. Quick version:
 > 1. Agent (from `agent/`): `TOKEN=yoursecret SYNC_FILE=~/Drive/bsync.json node index.js`
 >    (point `SYNC_FILE` at any local/NFS/SMB path or cloud-synced folder).
 > 2. Extension (from `extension/`): `npm install && npm test && npm run build`,
