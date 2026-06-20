@@ -61,6 +61,36 @@ async function ensurePermission(cfg) {
 
 function setStatus(text) { $("status").textContent = text; }
 
+function summarize(result) {
+  const parts = [];
+  if (result?.bookmark) parts.push(`bookmarks: applied ${result.bookmark.applied}`);
+  if (result?.tab) parts.push(`tabs: applied ${result.tab.applied}`);
+  return parts.length ? `Synced (${parts.join("; ")}).` : "Synced.";
+}
+
+// Render the cached "other devices' tabs" view (set by the background worker).
+async function renderRemoteTabs() {
+  const box = $("remoteTabs");
+  const byDevice = (await browser.storage.local.get("browsersync:remoteTabs"))["browsersync:remoteTabs"] ?? {};
+  const devices = Object.entries(byDevice).filter(([, d]) => d.tabs?.length);
+  if (!devices.length) return; // keep the default hint
+  box.textContent = "";
+  for (const [, dev] of devices) {
+    const h = document.createElement("h4");
+    h.textContent = `${dev.deviceName} (${dev.tabs.length})`;
+    box.appendChild(h);
+    const ul = document.createElement("ul");
+    for (const t of dev.tabs) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = t.url; a.textContent = t.title || t.url; a.target = "_blank"; a.rel = "noreferrer";
+      li.appendChild(a);
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+  }
+}
+
 document.addEventListener("change", (e) => {
   if (e.target?.name === "transport") updateVisibility();
   saveConfig().catch((err) => setStatus(`Save failed: ${err.message}`));
@@ -74,10 +104,11 @@ $("syncNow").addEventListener("click", async () => {
     if (!granted) return setStatus("Permission denied for that endpoint — cannot sync.");
     setStatus("Syncing…");
     const result = await browser.runtime.sendMessage({ type: "SYNC_NOW" });
-    setStatus(`Synced: applied ${result?.applied ?? 0}, ${result?.total ?? 0} total records.`);
+    setStatus(summarize(result));
+    await renderRemoteTabs();
   } catch (err) {
     setStatus(`Sync failed: ${err.message}`);
   }
 });
 
-loadConfig().catch((err) => setStatus(`Load failed: ${err.message}`));
+loadConfig().then(renderRemoteTabs).catch((err) => setStatus(`Load failed: ${err.message}`));
