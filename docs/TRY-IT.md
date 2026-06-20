@@ -13,6 +13,9 @@ Plan on ~10–15 minutes the first time.
 ## What you'll need
 
 - **Node.js 18+** (the agent and the build both use it). Check with `node -v`.
+  Don't have it? `./setup.sh` will offer to download a **project-local** Node
+  into the project folder (no sudo, removed when the folder is) — so you can skip
+  installing it system-wide.
 - Two browsers to test across — any mix of Firefox and a Chromium browser
   (Chrome, Brave, Vivaldi, Edge).
 - A local clone of this repo.

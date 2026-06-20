@@ -118,9 +118,10 @@ else
 fi
 
 # --- 2. Build artifacts + dependencies (safe, regenerable) ------------------
-if env_or_confirm REMOVE_BUILD "Remove build output and node_modules (dist/, node_modules)?" y; then
+if env_or_confirm REMOVE_BUILD "Remove build output, node_modules, and any project-local Node?" y; then
   rm_path "$PROJECT_DIR/extension/dist" "extension build output"
   rm_path "$PROJECT_DIR/extension/node_modules" "extension node_modules"
+  rm_path "$PROJECT_DIR/.node" "project-local Node (if installed by setup.sh)"
 fi
 
 # --- 3. Generated agent files (config, launcher, local state) ---------------

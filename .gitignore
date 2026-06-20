@@ -13,3 +13,4 @@ coverage/
 agent/browsersync.env
 agent/run-agent.sh
 agent/state.json
+.node/
