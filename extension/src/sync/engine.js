@@ -9,6 +9,7 @@ import { makeRecord, stableStringify } from "../model/records.js";
 import { mergeState } from "./merge.js";
 import { ConcurrencyError } from "../transport/adapter.js";
 import { STATE_SCHEMA_VERSION, assertStateWritable } from "../model/version.js";
+import { validateState, LargeChangeError } from "../model/validate.js";
 
 function maxLamport(...maps) {
   let m = 0;
@@ -39,7 +40,10 @@ function maxLamport(...maps) {
  * @returns {Promise<{applied:number,total:number}>}
  */
 export async function runSyncCycle(deps) {
-  const { transport, collect, apply, store, type = "bookmark", owns = () => true } = deps;
+  const {
+    transport, collect, apply, store, type = "bookmark", owns = () => true,
+    maxRemovals = null, allowLargeChange = false,
+  } = deps;
   const deviceId = await store.getDeviceId();
   const baseline = await store.getBaseline();
   const storedLamport = await store.getLamport();
@@ -56,6 +60,8 @@ export async function runSyncCycle(deps) {
   // 2..5 wrapped so an optimistic-concurrency conflict can re-pull and retry.
   for (let attempt = 0; ; attempt++) {
     const pulled = await transport.pull();
+    // Corruption guard: refuse to act on state that isn't plausibly valid.
+    validateState(pulled.state);
     // Cross-version safety: never overwrite state from a newer schema major.
     assertStateWritable(pulled.state);
     const allRemote = pulled.state?.records ?? {};
@@ -101,6 +107,13 @@ export async function runSyncCycle(deps) {
     }
 
     const { merged, toApply } = mergeState(remote, local, liveLocalHashes);
+
+    // Large-change safeguard: pause before applying a lot of removals.
+    if (maxRemovals != null && !allowLargeChange) {
+      const removals = toApply.reduce((n, r) => n + (r.deleted ? 1 : 0), 0);
+      if (removals > maxRemovals) throw new LargeChangeError(removals, maxRemovals, type);
+    }
+
     await apply(toApply);
 
     try {

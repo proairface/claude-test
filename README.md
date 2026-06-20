@@ -93,6 +93,19 @@ all-sites access up front.
 (OAuth) module** are optional, separate downloads in this repo — they are not
 part of the published extension.
 
+## Safety & control
+
+Because sync can delete things, there are rails (all configurable in Options):
+
+- **Corruption guard** — refuses to act on sync data that doesn't look valid, so
+  a garbled/empty file can't wipe your data.
+- **Per-operation permissions** — allow sync to Add / Update / Remove
+  independently; uncheck *Remove* and sync will never delete your local entries.
+- **Large-change safeguard** — if a sync would remove more than N items it
+  pauses and asks before applying anything.
+- **Automatic backups** — bookmarks are snapshotted before any destructive sync,
+  with a one-click additive *Restore*.
+
 ## Uninstalling
 
 Clean removal is a first-class feature — BrowserSync creates no services, PATH

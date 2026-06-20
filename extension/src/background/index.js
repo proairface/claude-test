@@ -1,11 +1,10 @@
 // Service worker / background entry point.
 //
-// Sync is triggered three ways, all funneled through a single coalescing lock so
-// runs can never overlap or pile up:
-//   1. a configurable periodic alarm (the "pull" schedule),
-//   2. debounced reactions to local bookmark/tab changes ("sync when things
-//      change" — near-instant without polling), and
-//   3. on-demand "Sync now" from the options page.
+// Sync is triggered by a configurable alarm, debounced local-change events, and
+// on-demand "Sync now" — all funneled through one coalescing lock. Safety rails:
+// corruption guard + version guard (engine), per-operation permissions, a
+// large-change threshold that pauses for confirmation, and pre-destructive
+// bookmark backups.
 import browser from "../lib/browser.js";
 import { runSyncCycle } from "../sync/engine.js";
 import { collectBookmarks } from "../collectors/bookmarks.js";
@@ -16,25 +15,60 @@ import { createStore } from "../state/store.js";
 import { createTransport } from "../transport/index.js";
 import { periodForConfig } from "../sync/schedule.js";
 import { runConfigMigrations } from "../state/migrate.js";
+import { LargeChangeError } from "../model/validate.js";
+import { backupBookmarks, restoreBackup } from "../state/backups.js";
 
 const SYNC_ALARM = "browsersync:cycle";
 const CONFIG_KEY = "browsersync:config";
 const REMOTE_TABS_KEY = "browsersync:remoteTabs";
-const DEFAULT_CONFIG = { autoSync: true, intervalValue: 5, intervalUnit: "minutes", syncOnChange: true };
+const PENDING_KEY = "browsersync:pendingLargeChange";
+const BYPASS_KEY = "browsersync:allowLargeOnce";
+const DEFAULT_CONFIG = {
+  autoSync: true, intervalValue: 5, intervalUnit: "minutes", syncOnChange: true,
+  permissions: { add: true, update: true, remove: true }, confirmThreshold: 200, backups: true,
+};
 
 async function getConfig() {
   return { ...DEFAULT_CONFIG, ...((await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {}) };
 }
+async function getFlag(key) { return Boolean((await browser.storage.local.get(key))[key]); }
+async function consumeBypass() {
+  const v = await getFlag(BYPASS_KEY);
+  if (v) await browser.storage.local.set({ [BYPASS_KEY]: false });
+  return v;
+}
 
-// --- the actual sync work ---------------------------------------------------
+// --- sync work --------------------------------------------------------------
 async function syncBookmarks(cfg) {
-  return runSyncCycle({
-    transport: createTransport(cfg),
-    collect: collectBookmarks,
-    apply: applyBookmarks,
-    store: createStore("bookmark"),
-    type: "bookmark",
-  });
+  const perms = cfg.permissions ?? {};
+  const threshold = Number(cfg.confirmThreshold);
+  const maxRemovals = Number.isFinite(threshold) && threshold > 0 ? threshold : null;
+  const allowLargeChange = await consumeBypass();
+  try {
+    const res = await runSyncCycle({
+      transport: createTransport(cfg),
+      collect: collectBookmarks,
+      apply: async (recs) => {
+        if (cfg.backups !== false && recs.some((r) => r.deleted)) await backupBookmarks();
+        await applyBookmarks(recs, {
+          add: perms.add !== false, update: perms.update !== false, remove: perms.remove !== false,
+        });
+      },
+      store: createStore("bookmark"),
+      type: "bookmark",
+      maxRemovals,
+      allowLargeChange,
+    });
+    await browser.storage.local.remove(PENDING_KEY);
+    return res;
+  } catch (err) {
+    if (err instanceof LargeChangeError) {
+      await browser.storage.local.set({
+        [PENDING_KEY]: { count: err.count, limit: err.limit, type: err.recordType, ts: Date.now() },
+      });
+    }
+    throw err;
+  }
 }
 
 async function syncTabs(cfg, deviceId) {
@@ -42,7 +76,7 @@ async function syncTabs(cfg, deviceId) {
   const result = await runSyncCycle({
     transport: createTransport(cfg),
     collect: () => collectTabs(deviceId, cfg.deviceName ?? ""),
-    apply: applyTabs, // list-only
+    apply: applyTabs,
     store,
     type: "tab",
     owns: (rec, self) => rec.payload?.ownerDevice === self,
@@ -76,25 +110,23 @@ async function syncEnabled() {
   return summary;
 }
 
-// --- coalescing lock: at most one sync at a time ----------------------------
+// --- coalescing lock --------------------------------------------------------
 let inFlight = null;
 function runSync() {
-  if (inFlight) return inFlight; // join the run already in progress
+  if (inFlight) return inFlight;
   inFlight = syncEnabled()
     .then((s) => { console.log("[BrowserSync] synced", s); return s; })
-    .catch((err) => { console.error("[BrowserSync] sync failed", err); throw err; })
+    .catch((err) => { console.warn("[BrowserSync] sync stopped:", err.message); throw err; })
     .finally(() => { inFlight = null; });
   return inFlight;
 }
 
-// --- debounced trigger for local changes ------------------------------------
+// --- debounced local-change trigger ----------------------------------------
 let debounceTimer = null;
-const DEBOUNCE_MS = 4000;
 function requestSyncDebounced() {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => runSync().catch(() => {}), DEBOUNCE_MS);
+  debounceTimer = setTimeout(() => runSync().catch(() => {}), 4000);
 }
-
 async function onLocalChange(kind) {
   const cfg = await getConfig();
   if (!cfg.syncOnChange) return;
@@ -103,14 +135,13 @@ async function onLocalChange(kind) {
   requestSyncDebounced();
 }
 
-// --- (re)configure the periodic alarm from saved config ---------------------
+// --- periodic alarm from config ---------------------------------------------
 async function applyAlarm() {
   const cfg = await getConfig();
   await browser.alarms.clear(SYNC_ALARM);
   const period = periodForConfig(cfg);
-  if (period == null) return; // auto-sync disabled
+  if (period == null) return;
   await browser.alarms.create(SYNC_ALARM, { periodInMinutes: period });
-  console.log(`[BrowserSync] periodic sync every ~${period} min`);
 }
 
 // --- wiring -----------------------------------------------------------------
@@ -118,29 +149,34 @@ browser.runtime.onInstalled.addListener(async (details) => {
   if (details?.reason === "update" || details?.reason === "install") await runConfigMigrations();
   await createStore("bookmark").getDeviceId();
   await applyAlarm();
-  console.log(`[BrowserSync] ${details?.reason ?? "ready"}.`);
 });
 browser.runtime.onStartup?.addListener(applyAlarm);
 
 browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SYNC_ALARM) runSync().catch(() => {});
 });
-
-// Re-apply the schedule whenever settings change.
 browser.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes[CONFIG_KEY]) applyAlarm();
 });
 
-// Local-change listeners (gated by config inside onLocalChange).
 for (const ev of ["onCreated", "onChanged", "onRemoved", "onMoved"]) {
   browser.bookmarks?.[ev]?.addListener(() => onLocalChange("bookmark"));
 }
 browser.tabs?.onCreated?.addListener(() => onLocalChange("tab"));
 browser.tabs?.onRemoved?.addListener(() => onLocalChange("tab"));
 browser.tabs?.onUpdated?.addListener((_id, info) => {
-  if (info.url || info.status === "complete") onLocalChange("tab"); // ignore noisy intermediate events
+  if (info.url || info.status === "complete") onLocalChange("tab");
 });
 
 browser.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === "SYNC_NOW") return runSync(); // Promise -> reply
+  switch (msg?.type) {
+    case "SYNC_NOW":
+      return runSync();
+    case "APPROVE_LARGE_CHANGE": // user confirmed a paused large change
+      return browser.storage.local.set({ [BYPASS_KEY]: true }).then(runSync);
+    case "RESTORE_BACKUP":
+      return restoreBackup(msg.ts);
+    default:
+      return undefined;
+  }
 });

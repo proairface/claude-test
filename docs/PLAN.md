@@ -93,6 +93,23 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - **Protocol version:** agent `/health` reports `protocol`; `isProtocolCompatible`
   in the extension. 6 new tests. 44 total.
 
+## M4.7 — Safety & user control ✅ (done)
+- **Corruption guard:** `validateState` rejects state that parses but isn't
+  plausible (e.g. an empty/garbled file from a cloud conflict) so the engine
+  aborts instead of applying/overwriting it.
+- **Per-operation permissions:** Options checkboxes for what sync may do to this
+  browser — Add / Update / Remove independently (default all on). Enforced by a
+  pure `plannedAction` in the bookmark applier.
+- **Large-change safeguard:** a configurable threshold; if a sync would remove
+  more than N local items the cycle throws `LargeChangeError` and **does not
+  apply or push**. The options page surfaces a panel to "Approve once & sync"
+  (one-shot bypass).
+- **Automatic backups + restore:** before a sync removes any bookmark, snapshot
+  the current bookmarks (kept last 3, `unlimitedStorage`); the options page lists
+  backups with an additive "Restore (re-add)" action.
+- 9 new tests (validate, permissions, backup trim, large-change abort/bypass).
+  53 total.
+
 ## M5 — History sync  (~1.5 days)
 - `collectors/history.js`, `appliers/history.js` with capability branching.
 - Firefox: real `visitTime`. Chromium: documented current-time stamping.
