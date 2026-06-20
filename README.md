@@ -64,8 +64,17 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and
 [`docs/SYNC-PROTOCOL.md`](docs/SYNC-PROTOCOL.md) for the data model and merge
 rules.
 
+## Uninstalling
+
+Clean removal is a first-class feature — BrowserSync creates no services, PATH
+entries, shell-rc edits, global packages, or system files. Run `./uninstall.sh`
+(or `./uninstall.sh --dry-run` to preview). Your sync data and project folder
+are kept unless you opt in. Full footprint + manual steps:
+[`docs/UNINSTALL.md`](docs/UNINSTALL.md).
+
 ## Layout
 
 - `extension/` — the WebExtension (Manifest V3, single codebase for all browsers)
 - `agent/` — the optional local sync agent / self-hosted server
-- `docs/` — architecture, sync protocol, and the implementation plan
+- `docs/` — architecture, sync protocol, the plan, and try-it/uninstall guides
+- `setup.sh` / `uninstall.sh` — interactive install and clean removal
