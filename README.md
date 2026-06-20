@@ -11,7 +11,15 @@ APIs, so the browser treats imported activity the same as local activity.
 > agent. Tabs (M4) and history (M5) are still stubs. See
 > [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
 >
-> **Try it:** see [`docs/TRY-IT.md`](docs/TRY-IT.md) for a full local
+> **Easiest start — the setup script** clones/updates the repo, installs deps,
+> builds both targets, and configures + optionally starts the agent:
+> ```bash
+> ./setup.sh            # interactive; or run from a fresh download to bootstrap
+> ```
+> It writes `agent/run-agent.sh` (a one-command launcher) and prints exactly
+> what to load and which Options values to enter.
+>
+> **Try it:** see [`docs/TRY-IT.md`](docs/TRY-IT.md) for the full manual
 > walkthrough. Quick version:
 > 1. Agent (from `agent/`): `TOKEN=yoursecret SYNC_FILE=~/Drive/bsync.json node index.js`
 >    (point `SYNC_FILE` at any local/NFS/SMB path or cloud-synced folder).

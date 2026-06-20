@@ -6,6 +6,10 @@ bookmarks sync via the local agent).
 
 Plan on ~10–15 minutes the first time.
 
+> **Shortcut:** `./setup.sh` from the repo root automates Steps 1–4 below
+> (install, build, configure the agent, write a launcher) and can start the
+> agent for you. The manual steps remain here for reference and troubleshooting.
+
 ## What you'll need
 
 - **Node.js 18+** (the agent and the build both use it). Check with `node -v`.
