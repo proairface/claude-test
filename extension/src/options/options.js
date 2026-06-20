@@ -16,6 +16,10 @@ function readForm() {
       tabs: $("syncTabs").checked,
       history: $("syncHistory").checked,
     },
+    autoSync: $("autoSync").checked,
+    intervalValue: Number($("intervalValue").value) || 5,
+    intervalUnit: $("intervalUnit").value,
+    syncOnChange: $("syncOnChange").checked,
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -33,15 +37,20 @@ async function loadConfig() {
     $("syncTabs").checked = Boolean(cfg.enabled.tabs);
     $("syncHistory").checked = Boolean(cfg.enabled.history);
   }
+  if (cfg.autoSync != null) $("autoSync").checked = cfg.autoSync;
+  if (cfg.intervalValue != null) $("intervalValue").value = cfg.intervalValue;
+  if (cfg.intervalUnit) $("intervalUnit").value = cfg.intervalUnit;
+  if (cfg.syncOnChange != null) $("syncOnChange").checked = cfg.syncOnChange;
   updateVisibility();
 }
 
 function updateVisibility() {
   const sel = document.querySelector('input[name="transport"]:checked')?.value ?? "";
-  for (const g of document.querySelectorAll(".group")) {
+  for (const g of document.querySelectorAll(".group[data-for]")) {
     const applies = (g.dataset.for ?? "").split(/\s+/).includes(sel);
     g.style.display = applies ? "" : "none";
   }
+  $("intervalGroup").style.display = $("autoSync").checked ? "" : "none";
 }
 
 async function saveConfig() {
@@ -91,8 +100,8 @@ async function renderRemoteTabs() {
   }
 }
 
-document.addEventListener("change", (e) => {
-  if (e.target?.name === "transport") updateVisibility();
+document.addEventListener("change", () => {
+  updateVisibility();
   saveConfig().catch((err) => setStatus(`Save failed: ${err.message}`));
 });
 
