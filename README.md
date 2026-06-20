@@ -5,11 +5,17 @@ A cross-browser extension that synchronizes **bookmarks**, **open tabs**, and
 Edge, Chromium). Synced entries are written back using each browser's native
 APIs, so the browser treats imported activity the same as local activity.
 
-> **Status: M1 + M2 + M3 implemented.** Build harness, bookmarks two-way sync
-> (tested CRDT engine), and the local sync agent + file transport all work —
-> 22 passing tests including a real end-to-end two-device sync through the
-> agent. Tabs (M4) and history (M5) are still stubs. See
-> [`docs/PLAN.md`](docs/PLAN.md) for milestone status.
+> **Status: M1 + M2 + M3 + pluggable transports implemented.** Build harness,
+> bookmarks two-way sync (tested CRDT engine), the local sync agent, and
+> **multiple transports — WebDAV (no host software), self-hosted server, local
+> agent, browser storage** — all work, with 30 passing tests including real
+> end-to-end two-device syncs over both the agent and WebDAV. Tabs (M4) and
+> history (M5) are still stubs. See [`docs/PLAN.md`](docs/PLAN.md).
+>
+> **No extra software?** Pick the **WebDAV** transport in Options — the
+> extension talks to your WebDAV server (Nextcloud/NAS) directly, so Node/the
+> agent isn't needed. The agent is only for the *local-file* transport. See
+> [Transports](#transports).
 >
 > **Easiest start — the setup script** clones/updates the repo, installs deps
 > (and, if Node 18+ isn't found, offers a no-sudo project-local Node download),
@@ -64,6 +70,28 @@ Firefox they carry their true original timestamps.
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and
 [`docs/SYNC-PROTOCOL.md`](docs/SYNC-PROTOCOL.md) for the data model and merge
 rules.
+
+## Transports
+
+The two browsers need a shared "rendezvous" to exchange data. You pick how, in
+the extension's Options — **every adapter is plain `fetch()` and ships inside
+the extension**, so the extension stays store-publishable regardless of choice:
+
+| Transport | Extra software on your PC | Notes |
+| --- | --- | --- |
+| **WebDAV** | **None** | Talks directly to Nextcloud / a NAS / any WebDAV URL. Recommended for a pure-extension setup. |
+| **Self-hosted server** | None on your PC | Same protocol as the agent at a remote URL; you host the server elsewhere. |
+| **Local agent** | Yes (the Node agent) | Only this one needs the agent — it owns local-file I/O so the sync file can live on a local/NFS/SMB path or a cloud-synced folder. |
+| **Browser `storage.sync`** | None | Demo only — tiny quota, does not bridge Firefox ↔ Chromium. |
+
+Permissions are requested **per endpoint, on demand** (when you enter a URL),
+not broadly at install time — so the published extension asks for no scary
+all-sites access up front.
+
+**What ships in the store vs. what's a separate download:** the extension
+(all adapters) is store-ready. The **agent** binary and any future **cloud
+(OAuth) module** are optional, separate downloads in this repo — they are not
+part of the published extension.
 
 ## Uninstalling
 

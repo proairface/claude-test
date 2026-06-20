@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "description": "Sync bookmarks, tabs, and history across Firefox and Chromium browsers.",
   "permissions": ["bookmarks", "tabs", "history", "storage", "alarms"],
-  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "background/index.js", "type": "module" },
   "options_ui": { "page": "options/options.html", "open_in_tab": true },
   "action": { "default_title": "BrowserSync" }

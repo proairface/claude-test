@@ -1,64 +1,83 @@
-// Options page logic: persist the transport config and trigger a sync on demand.
+// Options page: persist transport config, request host permission for the
+// chosen endpoint on demand (so the extension needs no broad install-time host
+// access), and trigger a sync.
 import browser from "../lib/browser.js";
+import { originsForConfig } from "../transport/index.js";
 
 const CONFIG_KEY = "browsersync:config";
 const $ = (id) => document.getElementById(id);
+const TEXT_FIELDS = ["webdavUrl", "webdavUser", "webdavPass", "baseUrl", "token", "deviceName"];
 
-async function loadConfig() {
-  const cfg = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
-  if (cfg.transport) {
-    const radio = document.querySelector(`input[name="transport"][value="${cfg.transport}"]`);
-    if (radio) radio.checked = true;
-  }
-  if (cfg.baseUrl) $("baseUrl").value = cfg.baseUrl;
-  if (cfg.token) $("token").value = cfg.token;
-  if (cfg.deviceName) $("deviceName").value = cfg.deviceName;
-  for (const t of ["Bookmarks", "Tabs", "History"]) {
-    if (cfg.enabled && t.toLowerCase() in cfg.enabled) {
-      $(`sync${t}`).checked = Boolean(cfg.enabled[t.toLowerCase()]);
-    }
-  }
-}
-
-async function saveConfig() {
+function readForm() {
   const cfg = {
     transport: document.querySelector('input[name="transport"]:checked')?.value ?? "localAgent",
-    baseUrl: $("baseUrl").value.trim(),
-    token: $("token").value,
-    deviceName: $("deviceName").value.trim(),
     enabled: {
       bookmarks: $("syncBookmarks").checked,
       tabs: $("syncTabs").checked,
       history: $("syncHistory").checked,
     },
   };
+  for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
+  return cfg;
+}
+
+async function loadConfig() {
+  const cfg = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+  if (cfg.transport) {
+    const r = document.querySelector(`input[name="transport"][value="${cfg.transport}"]`);
+    if (r) r.checked = true;
+  }
+  for (const f of TEXT_FIELDS) if (cfg[f] != null) $(f).value = cfg[f];
+  if (cfg.enabled) {
+    $("syncBookmarks").checked = cfg.enabled.bookmarks !== false;
+    $("syncTabs").checked = Boolean(cfg.enabled.tabs);
+    $("syncHistory").checked = Boolean(cfg.enabled.history);
+  }
+  updateVisibility();
+}
+
+function updateVisibility() {
+  const sel = document.querySelector('input[name="transport"]:checked')?.value ?? "";
+  for (const g of document.querySelectorAll(".group")) {
+    const applies = (g.dataset.for ?? "").split(/\s+/).includes(sel);
+    g.style.display = applies ? "" : "none";
+  }
+}
+
+async function saveConfig() {
+  const cfg = readForm();
   await browser.storage.local.set({ [CONFIG_KEY]: cfg });
   return cfg;
 }
 
-function setStatus(text) {
-  let el = $("status");
-  if (!el) {
-    el = document.createElement("p");
-    el.id = "status";
-    document.body.appendChild(el);
-  }
-  el.textContent = text;
+// Ask for permission to talk to the configured endpoint, only when needed.
+async function ensurePermission(cfg) {
+  const origins = originsForConfig(cfg);
+  if (!origins.length) return true;
+  if (await browser.permissions.contains({ origins })) return true;
+  // Must be called from a user gesture (the button click) on Firefox.
+  return browser.permissions.request({ origins });
 }
 
-document.addEventListener("change", () => {
-  saveConfig().catch((e) => setStatus(`Save failed: ${e.message}`));
+function setStatus(text) { $("status").textContent = text; }
+
+document.addEventListener("change", (e) => {
+  if (e.target?.name === "transport") updateVisibility();
+  saveConfig().catch((err) => setStatus(`Save failed: ${err.message}`));
 });
 
-$("syncNow")?.addEventListener("click", async () => {
-  await saveConfig();
-  setStatus("Syncing…");
+$("syncNow").addEventListener("click", async () => {
+  const cfg = await saveConfig();
+  setStatus("Requesting access…");
   try {
+    const granted = await ensurePermission(cfg);
+    if (!granted) return setStatus("Permission denied for that endpoint — cannot sync.");
+    setStatus("Syncing…");
     const result = await browser.runtime.sendMessage({ type: "SYNC_NOW" });
     setStatus(`Synced: applied ${result?.applied ?? 0}, ${result?.total ?? 0} total records.`);
-  } catch (e) {
-    setStatus(`Sync failed: ${e.message}`);
+  } catch (err) {
+    setStatus(`Sync failed: ${err.message}`);
   }
 });
 
-loadConfig().catch((e) => setStatus(`Load failed: ${e.message}`));
+loadConfig().catch((err) => setStatus(`Load failed: ${err.message}`));

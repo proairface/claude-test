@@ -40,6 +40,23 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - Still TODO (small): options-page field already exists for the agent URL/token;
   a per-path picker UI is a nicety, not required.
 
+## M3.5 — Pluggable network transports ✅ (done)
+- **WebDAV** adapter (`transport/webdavAdapter.js`): direct Basic-auth GET/PUT
+  with ETag `If-Match` / create-only `If-None-Match`, auto-`MKCOL` of parent
+  collections — **no host software** needed.
+- **Self-hosted server** adapter made real (same protocol as the agent at a
+  remote URL).
+- Transport **factory** (`transport/index.js`) selects the adapter from config;
+  background worker is now fully transport-agnostic.
+- Options page: WebDAV fields + per-transport visibility, and **on-demand host
+  permission** requests (`optional_host_permissions` + `permissions.request`) so
+  the extension carries no broad install-time host access — store-friendly.
+- 8 new tests (mock WebDAV server: auth, round-trip, conflict, MKCOL; plus a
+  two-device end-to-end sync over WebDAV). 30 tests total.
+- **Store-publishing posture:** all adapters ship in the extension (just
+  `fetch`); the agent binary and a future cloud/OAuth module stay separate
+  downloads, never part of the store package.
+
 ## M4 — Open tabs sync  (~1 day)
 - `collectors/tabs.js`, `appliers/tabs.js`, per-device tab sets.
 - Options: "show other devices' tabs" (list) vs. "restore on demand".
