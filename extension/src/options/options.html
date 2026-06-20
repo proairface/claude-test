@@ -8,26 +8,40 @@
       body { font: 14px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
       fieldset { margin-bottom: 1rem; }
       label { display: block; margin: .25rem 0; }
+      .group { margin: .5rem 0 .25rem 1.25rem; padding-left: .75rem; border-left: 2px solid #ddd; }
+      .hint { color: #666; font-size: .85em; }
+      #status { font-weight: 600; }
     </style>
   </head>
   <body>
     <h1>BrowserSync</h1>
-    <p><em>Scaffold UI — controls are not wired yet (see docs/PLAN.md).</em></p>
 
     <fieldset>
       <legend>Transport</legend>
+
+      <label><input type="radio" name="transport" value="webdav" /> WebDAV (no extra software — Nextcloud, NAS, …)</label>
+      <div class="group" data-for="webdav">
+        <label>WebDAV file URL: <input id="webdavUrl" type="text" placeholder="https://cloud.example.com/remote.php/dav/files/me/browsersync/state.json" size="48" /></label>
+        <label>Username: <input id="webdavUser" type="text" autocomplete="username" /></label>
+        <label>Password / app token: <input id="webdavPass" type="password" autocomplete="current-password" /></label>
+        <p class="hint">Point the URL at a JSON file in a folder you can write to. The folder is created if missing.</p>
+      </div>
+
       <label><input type="radio" name="transport" value="localAgent" checked /> Local agent (file / NFS / SMB / cloud folder)</label>
       <label><input type="radio" name="transport" value="remoteServer" /> Self-hosted server</label>
+      <div class="group" data-for="localAgent remoteServer">
+        <label>Agent / Server URL: <input id="baseUrl" type="text" value="http://127.0.0.1:8787" size="32" /></label>
+        <label>Token: <input id="token" type="password" /></label>
+      </div>
+
       <label><input type="radio" name="transport" value="browserStorage" /> Browser storage.sync (demo only)</label>
-      <label>Agent URL / Server URL: <input id="baseUrl" type="text" value="http://127.0.0.1:8787" /></label>
-      <label>Token: <input id="token" type="password" /></label>
     </fieldset>
 
     <fieldset>
       <legend>What to sync</legend>
       <label><input type="checkbox" id="syncBookmarks" checked /> Bookmarks</label>
-      <label><input type="checkbox" id="syncTabs" checked /> Open tabs</label>
-      <label><input type="checkbox" id="syncHistory" checked /> History</label>
+      <label><input type="checkbox" id="syncTabs" checked /> Open tabs <span class="hint">(coming soon)</span></label>
+      <label><input type="checkbox" id="syncHistory" checked /> History <span class="hint">(coming soon)</span></label>
     </fieldset>
 
     <fieldset>
@@ -36,6 +50,7 @@
     </fieldset>
 
     <button id="syncNow">Sync now</button>
+    <p id="status"></p>
     <script type="module" src="options.js"></script>
   </body>
 </html>

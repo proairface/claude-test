@@ -1,26 +1,20 @@
 // Service worker / background entry point. Registers a periodic alarm and an
 // on-demand "sync now" message, both of which run a bookmarks sync cycle.
-//
-// NOTE: the active transport is selectable in the options page; until the local
-// agent (M3) lands, the localAgent adapter is the default target. The engine
-// itself is transport-agnostic.
+// The active transport is selectable in the options page; the engine itself is
+// transport-agnostic.
 import browser from "../lib/browser.js";
 import { runSyncCycle } from "../sync/engine.js";
 import { collectBookmarks } from "../collectors/bookmarks.js";
 import { applyBookmarks } from "../appliers/bookmarks.js";
 import { createStore } from "../state/store.js";
-import { createLocalAgentAdapter } from "../transport/localAgentAdapter.js";
+import { createTransport } from "../transport/index.js";
 
 const SYNC_ALARM = "browsersync:cycle";
 
 async function buildDeps() {
   const cfg = (await browser.storage.local.get("browsersync:config"))["browsersync:config"] ?? {};
-  const transport = createLocalAgentAdapter({
-    baseUrl: cfg.baseUrl ?? "http://127.0.0.1:8787",
-    token: cfg.token,
-  });
   return {
-    transport,
+    transport: createTransport(cfg),
     collect: collectBookmarks,
     apply: applyBookmarks,
     store: createStore("bookmark"),
