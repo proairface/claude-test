@@ -11,12 +11,23 @@ import { collectBookmarks } from "../collectors/bookmarks.js";
 import { applyBookmarks } from "../appliers/bookmarks.js";
 import { collectTabs } from "../collectors/tabs.js";
 import { applyTabs } from "../appliers/tabs.js";
+import { collectHistorySince } from "../collectors/history.js";
+import { applyHistory } from "../appliers/history.js";
+import { runHistorySync } from "../sync/history.js";
 import { createStore } from "../state/store.js";
 import { createTransport } from "../transport/index.js";
 import { periodForConfig } from "../sync/schedule.js";
 import { runConfigMigrations } from "../state/migrate.js";
 import { LargeChangeError } from "../model/validate.js";
 import { backupBookmarks, restoreBackup } from "../state/backups.js";
+import { buildSnapshot, parseSnapshot, recordsByType } from "../state/portable.js";
+import { makeUrlFilter } from "../model/filters.js";
+
+const urlFilterFor = (cfg) => makeUrlFilter(cfg.filters);
+const keepFor = (cfg) => {
+  const f = urlFilterFor(cfg);
+  return (rec) => { const u = rec.payload?.url; return u ? f(u) : true; };
+};
 
 const SYNC_ALARM = "browsersync:cycle";
 const CONFIG_KEY = "browsersync:config";
@@ -29,7 +40,11 @@ const DEFAULT_CONFIG = {
 };
 
 async function getConfig() {
-  return { ...DEFAULT_CONFIG, ...((await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {}) };
+  const raw = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+  const activeProfile = raw.activeProfile ?? "default";
+  const profiles = raw.profiles ?? { default: raw }; // legacy flat config = default profile
+  const settings = profiles[activeProfile] ?? profiles.default ?? {};
+  return { ...DEFAULT_CONFIG, ...settings, _profileId: activeProfile };
 }
 async function getFlag(key) { return Boolean((await browser.storage.local.get(key))[key]); }
 async function consumeBypass() {
@@ -39,25 +54,29 @@ async function consumeBypass() {
 }
 
 // --- sync work --------------------------------------------------------------
-async function syncBookmarks(cfg) {
+async function syncBookmarks(cfg, { dryRun = false } = {}) {
   const perms = cfg.permissions ?? {};
   const threshold = Number(cfg.confirmThreshold);
   const maxRemovals = Number.isFinite(threshold) && threshold > 0 ? threshold : null;
-  const allowLargeChange = await consumeBypass();
+  const allowLargeChange = dryRun ? false : await consumeBypass();
+  const filter = urlFilterFor(cfg);
   try {
     const res = await runSyncCycle({
       transport: createTransport(cfg),
-      collect: collectBookmarks,
+      collect: () => collectBookmarks(filter),
+      keep: keepFor(cfg),
+      dryRun,
       apply: async (recs) => {
         if (cfg.backups !== false && recs.some((r) => r.deleted)) await backupBookmarks();
         await applyBookmarks(recs, {
           add: perms.add !== false, update: perms.update !== false, remove: perms.remove !== false,
         });
       },
-      store: createStore("bookmark"),
+      store: createStore("bookmark", cfg._profileId),
       type: "bookmark",
       maxRemovals,
       allowLargeChange,
+      mode: cfg.role ?? "sync",
     });
     await browser.storage.local.remove(PENDING_KEY);
     return res;
@@ -71,17 +90,21 @@ async function syncBookmarks(cfg) {
   }
 }
 
-async function syncTabs(cfg, deviceId) {
-  const store = createStore("tab");
+async function syncTabs(cfg, deviceId, { dryRun = false } = {}) {
+  const store = createStore("tab", cfg._profileId);
+  const filter = urlFilterFor(cfg);
   const result = await runSyncCycle({
     transport: createTransport(cfg),
-    collect: () => collectTabs(deviceId, cfg.deviceName ?? ""),
+    collect: () => collectTabs(deviceId, cfg.deviceName ?? "", filter),
     apply: applyTabs,
     store,
     type: "tab",
     owns: (rec, self) => rec.payload?.ownerDevice === self,
+    keep: keepFor(cfg),
+    mode: cfg.role ?? "sync",
+    dryRun,
   });
-  await cacheRemoteTabs(store, deviceId);
+  if (!dryRun) await cacheRemoteTabs(store, deviceId);
   return result;
 }
 
@@ -100,14 +123,92 @@ async function cacheRemoteTabs(store, deviceId) {
   await browser.storage.local.set({ [REMOTE_TABS_KEY]: byDevice });
 }
 
-async function syncEnabled() {
+async function syncHistory(cfg, deviceId, { dryRun = false } = {}) {
+  const lookbackDays = Number(cfg.historyLookbackDays) > 0 ? Number(cfg.historyLookbackDays) : 90;
+  const filter = urlFilterFor(cfg);
+  return runHistorySync({
+    transport: createTransport(cfg),
+    collect: (since, knownIds, dev) => collectHistorySince(since, knownIds, dev, { filter }),
+    apply: applyHistory,
+    store: createStore("visit", cfg._profileId),
+    type: "visit",
+    keep: keepFor(cfg),
+    mode: cfg.role ?? "sync",
+    dryRun,
+    initialWatermark: Date.now() - lookbackDays * 86400000,
+  });
+}
+
+async function syncEnabled(opts = {}) {
   const cfg = await getConfig();
   const enabled = cfg.enabled ?? { bookmarks: true };
   const deviceId = await createStore("bookmark").getDeviceId();
   const summary = {};
-  if (enabled.bookmarks !== false) summary.bookmark = await syncBookmarks(cfg);
-  if (enabled.tabs) summary.tab = await syncTabs(cfg, deviceId);
+  if (enabled.bookmarks !== false) summary.bookmark = await syncBookmarks(cfg, opts);
+  if (enabled.tabs) summary.tab = await syncTabs(cfg, deviceId, opts);
+  if (enabled.history) summary.visit = await syncHistory(cfg, deviceId, opts);
   return summary;
+}
+
+// Preview: what a sync would change, applying/uploading nothing.
+async function previewSync() {
+  const summary = await syncEnabled({ dryRun: true });
+  const out = {};
+  for (const [type, res] of Object.entries(summary)) {
+    const changes = res.changes ?? [];
+    out[type] = {
+      add: changes.filter((c) => !c.deleted).map((c) => c.payload?.url).filter(Boolean).slice(0, 200),
+      remove: changes.filter((c) => c.deleted).map((c) => c.payload?.url).filter(Boolean).slice(0, 200),
+      addCount: changes.filter((c) => !c.deleted).length,
+      removeCount: changes.filter((c) => c.deleted).length,
+    };
+  }
+  return out;
+}
+
+// --- inspector: read the shared sync state (read-only) ----------------------
+async function inspectState() {
+  const cfg = await getConfig();
+  const pulled = await createTransport(cfg).pull();
+  const records = pulled.state?.records ?? {};
+  const rows = [];
+  const counts = {};
+  for (const rec of Object.values(records)) {
+    const type = rec.type ?? "bookmark";
+    counts[type] = (counts[type] ?? 0) + 1;
+    if (rec.deleted) continue;
+    rows.push({
+      type,
+      url: rec.payload?.url ?? "",
+      title: rec.payload?.title ?? "",
+      device: rec.payload?.deviceName || rec.deviceId || "",
+    });
+  }
+  return { counts, total: rows.length, rows };
+}
+
+// --- portable export / import (offline migration) ---------------------------
+async function exportSnapshot() {
+  const cfg = await getConfig();
+  const deviceId = await createStore("bookmark").getDeviceId();
+  const bookmarkItems = await collectBookmarks();
+  let historyItems = [];
+  if (cfg.enabled?.history) {
+    historyItems = await collectHistorySince(0, new Set(), deviceId, { maxResults: 50000 });
+  }
+  return buildSnapshot({ deviceId, deviceName: cfg.deviceName, bookmarkItems, historyItems });
+}
+
+async function importSnapshot(text) {
+  const cfg = await getConfig();
+  const perms = cfg.permissions ?? {};
+  const snap = parseSnapshot(text);
+  const bookmarks = recordsByType(snap, "bookmark");
+  const visits = recordsByType(snap, "visit");
+  // Additive only — import never removes or overwrites.
+  await applyBookmarks(bookmarks, { add: perms.add !== false, update: false, remove: false });
+  await applyHistory(visits);
+  return { bookmark: bookmarks.length, visit: visits.length };
 }
 
 // --- coalescing lock --------------------------------------------------------
@@ -172,10 +273,18 @@ browser.runtime.onMessage.addListener((msg) => {
   switch (msg?.type) {
     case "SYNC_NOW":
       return runSync();
+    case "PREVIEW_SYNC":
+      return previewSync();
     case "APPROVE_LARGE_CHANGE": // user confirmed a paused large change
       return browser.storage.local.set({ [BYPASS_KEY]: true }).then(runSync);
     case "RESTORE_BACKUP":
       return restoreBackup(msg.ts);
+    case "INSPECT_STATE":
+      return inspectState();
+    case "EXPORT_DATA":
+      return exportSnapshot();
+    case "IMPORT_DATA":
+      return importSnapshot(msg.text);
     default:
       return undefined;
   }

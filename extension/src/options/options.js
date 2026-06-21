@@ -4,6 +4,7 @@
 import browser from "../lib/browser.js";
 import { originsForConfig } from "../transport/index.js";
 import { listBackups } from "../state/backups.js";
+import { parseDomainList } from "../model/filters.js";
 
 const CONFIG_KEY = "browsersync:config";
 const PENDING_KEY = "browsersync:pendingLargeChange";
@@ -27,16 +28,21 @@ function readForm() {
     },
     confirmThreshold: Math.max(0, Number($("confirmThreshold").value) || 0),
     backups: $("backups").checked,
+    historyLookbackDays: Math.max(1, Number($("historyLookbackDays").value) || 90),
+    filters: { excludeDomains: parseDomainList($("excludeDomains").value) },
+    role: $("role").value,
+    encryption: { enabled: $("encEnabled").checked, passphrase: $("encPassphrase").value },
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
 }
 
-async function loadConfig() {
-  const cfg = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+function fillForm(cfg = {}) {
   if (cfg.transport) {
     const r = document.querySelector(`input[name="transport"][value="${cfg.transport}"]`);
     if (r) r.checked = true;
+  } else {
+    document.querySelector('input[name="transport"][value="localAgent"]').checked = true;
   }
   for (const f of TEXT_FIELDS) if (cfg[f] != null) $(f).value = cfg[f];
   if (cfg.enabled) {
@@ -55,6 +61,13 @@ async function loadConfig() {
   }
   if (cfg.confirmThreshold != null) $("confirmThreshold").value = cfg.confirmThreshold;
   if (cfg.backups != null) $("backups").checked = cfg.backups;
+  if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
+  if (cfg.filters?.excludeDomains) $("excludeDomains").value = cfg.filters.excludeDomains.join("\n");
+  if (cfg.role) $("role").value = cfg.role;
+  if (cfg.encryption) {
+    $("encEnabled").checked = Boolean(cfg.encryption.enabled);
+    if (cfg.encryption.passphrase) $("encPassphrase").value = cfg.encryption.passphrase;
+  }
   updateVisibility();
 }
 
@@ -65,12 +78,43 @@ function updateVisibility() {
     g.style.display = applies ? "" : "none";
   }
   $("intervalGroup").style.display = $("autoSync").checked ? "" : "none";
+  $("historyGroup").style.display = $("syncHistory").checked ? "" : "none";
+}
+
+// Profile state: { activeProfile, profiles: { id: settings } }.
+let cfgState = { activeProfile: "default", profiles: { default: {} } };
+
+async function loadState() {
+  const raw = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+  if (raw.profiles) {
+    cfgState = { activeProfile: raw.activeProfile ?? "default", profiles: raw.profiles };
+  } else {
+    cfgState = { activeProfile: "default", profiles: { default: raw } }; // migrate flat config
+  }
+  if (!cfgState.profiles[cfgState.activeProfile]) cfgState.activeProfile = Object.keys(cfgState.profiles)[0] ?? "default";
+}
+
+function renderProfiles() {
+  const sel = $("profileSelect");
+  sel.textContent = "";
+  for (const id of Object.keys(cfgState.profiles)) {
+    const o = document.createElement("option");
+    o.value = id; o.textContent = id;
+    if (id === cfgState.activeProfile) o.selected = true;
+    sel.appendChild(o);
+  }
+  $("profileDelete").disabled = cfgState.activeProfile === "default";
+}
+
+async function persistState() {
+  await browser.storage.local.set({ [CONFIG_KEY]: cfgState });
 }
 
 async function saveConfig() {
-  const cfg = readForm();
-  await browser.storage.local.set({ [CONFIG_KEY]: cfg });
-  return cfg;
+  const settings = readForm();
+  cfgState.profiles[cfgState.activeProfile] = settings;
+  await persistState();
+  return { ...settings, _profileId: cfgState.activeProfile };
 }
 
 // Ask for permission to talk to the configured endpoint, only when needed.
@@ -88,6 +132,7 @@ function summarize(result) {
   const parts = [];
   if (result?.bookmark) parts.push(`bookmarks: applied ${result.bookmark.applied}`);
   if (result?.tab) parts.push(`tabs: applied ${result.tab.applied}`);
+  if (result?.visit) parts.push(`history: applied ${result.visit.applied}`);
   return parts.length ? `Synced (${parts.join("; ")}).` : "Synced.";
 }
 
@@ -185,4 +230,150 @@ $("syncNow").addEventListener("click", async () => {
   await refreshPanels();
 });
 
-loadConfig().then(refreshPanels).catch((err) => setStatus(`Load failed: ${err.message}`));
+let inspectRows = [];
+function renderInspect() {
+  const q = $("inspectSearch").value.trim().toLowerCase();
+  const box = $("inspectResults");
+  const matches = !q
+    ? inspectRows
+    : inspectRows.filter((r) =>
+        (r.url + " " + r.title + " " + r.device).toLowerCase().includes(q));
+  box.textContent = "";
+  for (const r of matches.slice(0, 500)) {
+    const d = document.createElement("div");
+    d.textContent = `[${r.type}] ${r.title || r.url} — ${r.url} (${r.device})`;
+    box.appendChild(d);
+  }
+  if (matches.length > 500) {
+    const more = document.createElement("div");
+    more.className = "hint";
+    more.textContent = `…and ${matches.length - 500} more (refine the filter)`;
+    box.appendChild(more);
+  }
+}
+$("inspectLoad").addEventListener("click", async () => {
+  const cfg = await saveConfig();
+  setStatus("Loading shared data…");
+  try {
+    if (!(await ensurePermission(cfg))) return setStatus("Permission denied for that endpoint.");
+    const res = await browser.runtime.sendMessage({ type: "INSPECT_STATE" });
+    inspectRows = res.rows;
+    $("inspectCounts").textContent =
+      `${res.total} live records — ` +
+      Object.entries(res.counts).map(([t, c]) => `${t}: ${c}`).join(", ");
+    renderInspect();
+    setStatus("Loaded.");
+  } catch (err) {
+    setStatus(`Inspect failed: ${err.message}`);
+  }
+});
+$("inspectSearch").addEventListener("input", renderInspect);
+
+$("previewBtn").addEventListener("click", async () => {
+  const cfg = await saveConfig();
+  setStatus("Computing preview…");
+  const box = $("preview");
+  try {
+    const granted = await ensurePermission(cfg);
+    if (!granted) return setStatus("Permission denied for that endpoint.");
+    const preview = await browser.runtime.sendMessage({ type: "PREVIEW_SYNC" });
+    box.textContent = "";
+    const entries = Object.entries(preview);
+    const total = entries.reduce((n, [, p]) => n + p.addCount + p.removeCount, 0);
+    if (total === 0) {
+      box.textContent = "No changes — everything is already in sync.";
+    } else {
+      for (const [type, p] of entries) {
+        const h = document.createElement("div");
+        h.innerHTML = `<strong>${type}</strong>: +${p.addCount} add/update, −${p.removeCount} remove`;
+        box.appendChild(h);
+        for (const u of p.remove.slice(0, 20)) {
+          const d = document.createElement("div"); d.textContent = `− ${u}`; d.style.color = "#a00"; box.appendChild(d);
+        }
+        for (const u of p.add.slice(0, 20)) {
+          const d = document.createElement("div"); d.textContent = `+ ${u}`; d.style.color = "#070"; box.appendChild(d);
+        }
+      }
+    }
+    box.style.display = "";
+    setStatus("Preview ready (nothing applied).");
+  } catch (err) {
+    setStatus(`Preview failed: ${err.message}`);
+  }
+});
+
+$("exportBtn").addEventListener("click", async () => {
+  setStatus("Building export…");
+  try {
+    const snap = await browser.runtime.sendMessage({ type: "EXPORT_DATA" });
+    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `browsersync-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(`Exported ${snap.counts.bookmark} bookmarks, ${snap.counts.visit} visits.`);
+  } catch (err) {
+    setStatus(`Export failed: ${err.message}`);
+  }
+});
+
+$("importFile").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setStatus("Importing…");
+  try {
+    const text = await file.text();
+    const res = await browser.runtime.sendMessage({ type: "IMPORT_DATA", text });
+    setStatus(`Imported: ${res.bookmark} bookmarks, ${res.visit} visits (additive).`);
+    await refreshPanels();
+  } catch (err) {
+    setStatus(`Import failed: ${err.message}`);
+  } finally {
+    e.target.value = "";
+  }
+});
+
+$("profileSelect").addEventListener("change", async () => {
+  cfgState.activeProfile = $("profileSelect").value;
+  await persistState();
+  fillForm(cfgState.profiles[cfgState.activeProfile] ?? {});
+  $("profileDelete").disabled = cfgState.activeProfile === "default";
+  setStatus(`Switched to profile "${cfgState.activeProfile}".`);
+  await refreshPanels();
+});
+
+$("profileNew").addEventListener("click", async () => {
+  const name = prompt("New profile name:")?.trim();
+  if (!name) return;
+  if (cfgState.profiles[name]) return setStatus("A profile with that name already exists.");
+  cfgState.profiles[name] = {};
+  cfgState.activeProfile = name;
+  await persistState();
+  renderProfiles();
+  fillForm({});
+  setStatus(`Created profile "${name}".`);
+  await refreshPanels();
+});
+
+$("profileDelete").addEventListener("click", async () => {
+  const id = cfgState.activeProfile;
+  if (id === "default") return;
+  if (!confirm(`Delete profile "${id}"? Its sync history bookkeeping is also cleared.`)) return;
+  delete cfgState.profiles[id];
+  cfgState.activeProfile = "default";
+  await persistState();
+  renderProfiles();
+  fillForm(cfgState.profiles.default ?? {});
+  setStatus(`Deleted profile "${id}".`);
+  await refreshPanels();
+});
+
+async function init() {
+  await loadState();
+  renderProfiles();
+  fillForm(cfgState.profiles[cfgState.activeProfile] ?? {});
+  await refreshPanels();
+}
+init().catch((err) => setStatus(`Load failed: ${err.message}`));

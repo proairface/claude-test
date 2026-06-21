@@ -22,8 +22,11 @@ function naturalKey(url, parentPath) {
   return { url, parentPath };
 }
 
-/** @returns {Promise<BookmarkItem[]>} */
-export async function collectBookmarks() {
+/**
+ * @param {(url:string)=>boolean} [filter] keep-predicate; excluded urls are skipped
+ * @returns {Promise<BookmarkItem[]>}
+ */
+export async function collectBookmarks(filter = () => true) {
   const tree = await browser.bookmarks.getTree();
   const items = [];
 
@@ -32,6 +35,7 @@ export async function collectBookmarks() {
   async function walk(node, role, subPath) {
     if (node.url) {
       if (!role) return; // skip anything not under a known root (shouldn't happen)
+      if (!filter(node.url)) return; // excluded by user filters
       const parentPath = [role, ...subPath];
       const payload = {
         url: node.url,

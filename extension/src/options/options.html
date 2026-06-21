@@ -17,6 +17,17 @@
     <h1>BrowserSync</h1>
 
     <fieldset>
+      <legend>Profile</legend>
+      <label>Active profile:
+        <select id="profileSelect"></select>
+      </label>
+      <button id="profileNew" type="button">New…</button>
+      <button id="profileDelete" type="button">Delete</button>
+      <p class="hint">Each profile is an independent sync set (its own transport/file, filters, keys, and
+        sync history) — e.g. "personal" and "work" pointing at different files.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>Transport</legend>
 
       <label><input type="radio" name="transport" value="webdav" /> WebDAV (no extra software — Nextcloud, NAS, …)</label>
@@ -41,7 +52,14 @@
       <legend>What to sync</legend>
       <label><input type="checkbox" id="syncBookmarks" checked /> Bookmarks</label>
       <label><input type="checkbox" id="syncTabs" /> Open tabs</label>
-      <label><input type="checkbox" id="syncHistory" /> History <span class="hint">(coming soon)</span></label>
+      <label><input type="checkbox" id="syncHistory" /> History (append-only; never deletes)</label>
+      <div class="group" id="historyGroup">
+        <label>Sync visits from the last
+          <input id="historyLookbackDays" type="number" min="1" step="1" value="90" style="width:5rem" /> days
+        </label>
+        <p class="hint">Firefox keeps original visit dates; Chromium stamps imported visits at sync time
+          (a browser limitation). History is only ever added, never removed.</p>
+      </div>
     </fieldset>
 
     <fieldset>
@@ -70,6 +88,22 @@
     </fieldset>
 
     <fieldset>
+      <legend>Encryption</legend>
+      <label><input type="checkbox" id="encEnabled" /> Encrypt synced data with a passphrase (end-to-end)</label>
+      <label>Passphrase: <input id="encPassphrase" type="password" autocomplete="new-password" /></label>
+      <p class="hint">The transport (WebDAV/cloud/agent) only ever sees ciphertext. Enter the SAME passphrase on
+        every device. ⚠️ If you lose it, the data is unrecoverable — keep an unencrypted export somewhere safe.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Filters (privacy)</legend>
+      <label>Never sync these domains (bookmarks, history, tabs):</label>
+      <textarea id="excludeDomains" rows="3" style="width:100%; box-sizing:border-box"
+        placeholder="one per line, e.g.&#10;bank.example.com&#10;health.example"></textarea>
+      <p class="hint">Matches the domain and its subdomains. Already-synced entries on other devices aren't removed.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>Safety</legend>
       <label>Pause and ask if a sync would remove more than
         <input id="confirmThreshold" type="number" min="0" step="1" value="200" style="width:5rem" /> items
@@ -90,12 +124,41 @@
     </fieldset>
 
     <fieldset>
-      <legend>Device</legend>
-      <label>Device name: <input id="deviceName" type="text" placeholder="e.g. laptop-firefox" /></label>
+      <legend>Sync inspector</legend>
+      <button id="inspectLoad" type="button">Load shared data</button>
+      <input id="inspectSearch" type="search" placeholder="filter by url / title / device…" style="width:60%" />
+      <div id="inspectCounts" class="hint"></div>
+      <div id="inspectResults" style="max-height:16rem; overflow:auto; font:12px/1.4 monospace"></div>
     </fieldset>
 
+    <fieldset>
+      <legend>Export / Import (offline migration)</legend>
+      <p class="hint">Carry your data to a fresh browser with no server: export a file here,
+        then import it on the new machine. Import only ever adds.</p>
+      <button id="exportBtn" type="button">Export to file…</button>
+      <label style="display:inline-block; margin-left:1rem">Import from file:
+        <input id="importFile" type="file" accept="application/json,.json" />
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Device</legend>
+      <label>Device name: <input id="deviceName" type="text" placeholder="e.g. laptop-firefox" /></label>
+      <label>This device's role:
+        <select id="role">
+          <option value="sync">Two-way sync</option>
+          <option value="receive">Receive only (never upload)</option>
+          <option value="send">Send only (never apply incoming)</option>
+        </select>
+      </label>
+      <p class="hint">"Receive only" mirrors the shared data here without sharing this device's;
+        "Send only" is a master that uploads but ignores others.</p>
+    </fieldset>
+
+    <button id="previewBtn" type="button">Preview changes</button>
     <button id="syncNow">Sync now</button>
     <p id="status"></p>
+    <div id="preview" style="display:none; margin-top:.5rem; padding:.5rem; background:#eef6ff; border:1px solid #9cc3ee;"></div>
     <script type="module" src="options.js"></script>
   </body>
 </html>
