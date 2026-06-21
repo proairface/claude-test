@@ -41,6 +41,28 @@ For a signed `.xpi` outside AMO, use `web-ext sign` with AMO API credentials,
 then host the `.xpi` + an `update.json` and set `browser_specific_settings.
 gecko.update_url`. Not needed if you list on AMO.
 
+## GitHub Releases (hosting the zips)
+
+Build artifacts are **not** committed (`*.zip` and `web-ext-artifacts/` are
+gitignored) — they're reproducible with `npm run package`. To host downloadable
+builds on GitHub, attach the zips to a tagged Release:
+
+**Web UI:** Repo → Releases → Draft a new release → create tag `v<version>` →
+drag in `web-ext-artifacts/browsersync-{chrome,firefox}-<version>.zip` → Publish.
+
+**`gh` CLI:**
+```bash
+cd extension && npm run package
+gh release create v0.1.0 \
+  web-ext-artifacts/browsersync-chrome-0.1.0.zip \
+  web-ext-artifacts/browsersync-firefox-0.1.0.zip \
+  --title "BrowserSync v0.1.0" --notes "First packaged release"
+```
+
+Releases are best as a developer/sideload archive; for end users prefer the web
+stores (install + auto-update). Keep the Release tag in sync with the manifest
+`version`.
+
 ## The companion agent (separate download)
 The agent is **not** part of the store package. Distribute it from the repo.
 Users run it via `agent/run-agent.sh` (created by `setup.sh`) or a service:
