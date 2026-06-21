@@ -20,6 +20,7 @@ import { periodForConfig } from "../sync/schedule.js";
 import { runConfigMigrations } from "../state/migrate.js";
 import { LargeChangeError } from "../model/validate.js";
 import { backupBookmarks, restoreBackup } from "../state/backups.js";
+import { buildSnapshot, parseSnapshot, recordsByType } from "../state/portable.js";
 
 const SYNC_ALARM = "browsersync:cycle";
 const CONFIG_KEY = "browsersync:config";
@@ -126,6 +127,30 @@ async function syncEnabled() {
   return summary;
 }
 
+// --- portable export / import (offline migration) ---------------------------
+async function exportSnapshot() {
+  const cfg = await getConfig();
+  const deviceId = await createStore("bookmark").getDeviceId();
+  const bookmarkItems = await collectBookmarks();
+  let historyItems = [];
+  if (cfg.enabled?.history) {
+    historyItems = await collectHistorySince(0, new Set(), deviceId, { maxResults: 50000 });
+  }
+  return buildSnapshot({ deviceId, deviceName: cfg.deviceName, bookmarkItems, historyItems });
+}
+
+async function importSnapshot(text) {
+  const cfg = await getConfig();
+  const perms = cfg.permissions ?? {};
+  const snap = parseSnapshot(text);
+  const bookmarks = recordsByType(snap, "bookmark");
+  const visits = recordsByType(snap, "visit");
+  // Additive only — import never removes or overwrites.
+  await applyBookmarks(bookmarks, { add: perms.add !== false, update: false, remove: false });
+  await applyHistory(visits);
+  return { bookmark: bookmarks.length, visit: visits.length };
+}
+
 // --- coalescing lock --------------------------------------------------------
 let inFlight = null;
 function runSync() {
@@ -192,6 +217,10 @@ browser.runtime.onMessage.addListener((msg) => {
       return browser.storage.local.set({ [BYPASS_KEY]: true }).then(runSync);
     case "RESTORE_BACKUP":
       return restoreBackup(msg.ts);
+    case "EXPORT_DATA":
+      return exportSnapshot();
+    case "IMPORT_DATA":
+      return importSnapshot(msg.text);
     default:
       return undefined;
   }

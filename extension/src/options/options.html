@@ -97,6 +97,16 @@
     </fieldset>
 
     <fieldset>
+      <legend>Export / Import (offline migration)</legend>
+      <p class="hint">Carry your data to a fresh browser with no server: export a file here,
+        then import it on the new machine. Import only ever adds.</p>
+      <button id="exportBtn" type="button">Export to file…</button>
+      <label style="display:inline-block; margin-left:1rem">Import from file:
+        <input id="importFile" type="file" accept="application/json,.json" />
+      </label>
+    </fieldset>
+
+    <fieldset>
       <legend>Device</legend>
       <label>Device name: <input id="deviceName" type="text" placeholder="e.g. laptop-firefox" /></label>
     </fieldset>

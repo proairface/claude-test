@@ -189,4 +189,37 @@ $("syncNow").addEventListener("click", async () => {
   await refreshPanels();
 });
 
+$("exportBtn").addEventListener("click", async () => {
+  setStatus("Building export…");
+  try {
+    const snap = await browser.runtime.sendMessage({ type: "EXPORT_DATA" });
+    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `browsersync-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatus(`Exported ${snap.counts.bookmark} bookmarks, ${snap.counts.visit} visits.`);
+  } catch (err) {
+    setStatus(`Export failed: ${err.message}`);
+  }
+});
+
+$("importFile").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setStatus("Importing…");
+  try {
+    const text = await file.text();
+    const res = await browser.runtime.sendMessage({ type: "IMPORT_DATA", text });
+    setStatus(`Imported: ${res.bookmark} bookmarks, ${res.visit} visits (additive).`);
+    await refreshPanels();
+  } catch (err) {
+    setStatus(`Import failed: ${err.message}`);
+  } finally {
+    e.target.value = "";
+  }
+});
+
 loadConfig().then(refreshPanels).catch((err) => setStatus(`Load failed: ${err.message}`));
