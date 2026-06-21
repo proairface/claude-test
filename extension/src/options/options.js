@@ -31,6 +31,7 @@ function readForm() {
     historyLookbackDays: Math.max(1, Number($("historyLookbackDays").value) || 90),
     filters: { excludeDomains: parseDomainList($("excludeDomains").value) },
     role: $("role").value,
+    encryption: { enabled: $("encEnabled").checked, passphrase: $("encPassphrase").value },
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -62,6 +63,10 @@ async function loadConfig() {
   if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
   if (cfg.filters?.excludeDomains) $("excludeDomains").value = cfg.filters.excludeDomains.join("\n");
   if (cfg.role) $("role").value = cfg.role;
+  if (cfg.encryption) {
+    $("encEnabled").checked = Boolean(cfg.encryption.enabled);
+    if (cfg.encryption.passphrase) $("encPassphrase").value = cfg.encryption.passphrase;
+  }
   updateVisibility();
 }
 

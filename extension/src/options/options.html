@@ -77,6 +77,14 @@
     </fieldset>
 
     <fieldset>
+      <legend>Encryption</legend>
+      <label><input type="checkbox" id="encEnabled" /> Encrypt synced data with a passphrase (end-to-end)</label>
+      <label>Passphrase: <input id="encPassphrase" type="password" autocomplete="new-password" /></label>
+      <p class="hint">The transport (WebDAV/cloud/agent) only ever sees ciphertext. Enter the SAME passphrase on
+        every device. ⚠️ If you lose it, the data is unrecoverable — keep an unencrypted export somewhere safe.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>Filters (privacy)</legend>
       <label>Never sync these domains (bookmarks, history, tabs):</label>
       <textarea id="excludeDomains" rows="3" style="width:100%; box-sizing:border-box"

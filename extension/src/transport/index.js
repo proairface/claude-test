@@ -5,12 +5,21 @@ import { createLocalAgentAdapter } from "./localAgentAdapter.js";
 import { createRemoteServerAdapter } from "./remoteServerAdapter.js";
 import { createWebdavAdapter } from "./webdavAdapter.js";
 import { createBrowserStorageAdapter } from "./browserStorageAdapter.js";
+import { createEncryptedAdapter } from "./encryptedAdapter.js";
 
 /**
  * @param {object} cfg saved options (see options page)
  * @returns {import("./adapter.js").TransportAdapter}
  */
 export function createTransport(cfg = {}) {
+  const base = createBaseTransport(cfg);
+  if (cfg.encryption?.enabled && cfg.encryption.passphrase) {
+    return createEncryptedAdapter(base, cfg.encryption.passphrase);
+  }
+  return base;
+}
+
+function createBaseTransport(cfg = {}) {
   switch (cfg.transport) {
     case "webdav":
       return createWebdavAdapter({
