@@ -28,7 +28,10 @@ function maxLamport(...maps) {
  * @returns {Promise<{applied:number,total:number}>}
  */
 export async function runHistorySync(deps) {
-  const { transport, collect, apply, store, type = "visit", keep = () => true } = deps;
+  const { transport, collect, apply, store, type = "visit", keep = () => true, mode = "sync" } = deps;
+  const doCollect = mode !== "receive";
+  const doApply = mode !== "send";
+  const doPush = mode !== "receive";
   const deviceId = await store.getDeviceId();
   if (typeof transport.preflight === "function") await transport.preflight();
 
@@ -40,7 +43,7 @@ export async function runHistorySync(deps) {
   // Visits already in the shared state — never re-collect/re-broadcast them.
   const knownIds = new Set(Object.keys(baseline));
   const cycleStart = Date.now();
-  const newItems = await collect(watermark, knownIds, deviceId);
+  const newItems = doCollect ? await collect(watermark, knownIds, deviceId) : [];
 
   for (let attempt = 0; ; attempt++) {
     const pulled = await transport.pull();
@@ -79,21 +82,23 @@ export async function runHistorySync(deps) {
       toApply.push(rec);
     }
 
-    await apply(toApply);
+    await apply(doApply ? toApply : []);
 
-    try {
-      await transport.push(
-        { version: STATE_SCHEMA_VERSION, records: { ...other, ...merged }, updatedAt: Date.now() },
-        pulled.etag,
-      );
-    } catch (err) {
-      if (err instanceof ConcurrencyError && attempt < 3) continue;
-      throw err;
+    if (doPush) {
+      try {
+        await transport.push(
+          { version: STATE_SCHEMA_VERSION, records: { ...other, ...merged }, updatedAt: Date.now() },
+          pulled.etag,
+        );
+      } catch (err) {
+        if (err instanceof ConcurrencyError && attempt < 3) continue;
+        throw err;
+      }
     }
 
     await store.setLamport(tick);
     await store.setBaseline(merged);
     await store.setWatermark(cycleStart); // next cycle collects visits from here on
-    return { applied: toApply.length, total: Object.keys(merged).length };
+    return { applied: doApply ? toApply.length : 0, total: Object.keys(merged).length };
   }
 }

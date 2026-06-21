@@ -30,6 +30,7 @@ function readForm() {
     backups: $("backups").checked,
     historyLookbackDays: Math.max(1, Number($("historyLookbackDays").value) || 90),
     filters: { excludeDomains: parseDomainList($("excludeDomains").value) },
+    role: $("role").value,
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -60,6 +61,7 @@ async function loadConfig() {
   if (cfg.backups != null) $("backups").checked = cfg.backups;
   if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
   if (cfg.filters?.excludeDomains) $("excludeDomains").value = cfg.filters.excludeDomains.join("\n");
+  if (cfg.role) $("role").value = cfg.role;
   updateVisibility();
 }
 

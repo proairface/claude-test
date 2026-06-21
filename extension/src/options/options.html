@@ -117,6 +117,15 @@
     <fieldset>
       <legend>Device</legend>
       <label>Device name: <input id="deviceName" type="text" placeholder="e.g. laptop-firefox" /></label>
+      <label>This device's role:
+        <select id="role">
+          <option value="sync">Two-way sync</option>
+          <option value="receive">Receive only (never upload)</option>
+          <option value="send">Send only (never apply incoming)</option>
+        </select>
+      </label>
+      <p class="hint">"Receive only" mirrors the shared data here without sharing this device's;
+        "Send only" is a master that uploads but ignores others.</p>
     </fieldset>
 
     <button id="syncNow">Sync now</button>

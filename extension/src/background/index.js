@@ -71,6 +71,7 @@ async function syncBookmarks(cfg) {
       type: "bookmark",
       maxRemovals,
       allowLargeChange,
+      mode: cfg.role ?? "sync",
     });
     await browser.storage.local.remove(PENDING_KEY);
     return res;
@@ -95,6 +96,7 @@ async function syncTabs(cfg, deviceId) {
     type: "tab",
     owns: (rec, self) => rec.payload?.ownerDevice === self,
     keep: keepFor(cfg),
+    mode: cfg.role ?? "sync",
   });
   await cacheRemoteTabs(store, deviceId);
   return result;
@@ -125,6 +127,7 @@ async function syncHistory(cfg, deviceId) {
     store: createStore("visit"),
     type: "visit",
     keep: keepFor(cfg),
+    mode: cfg.role ?? "sync",
     initialWatermark: Date.now() - lookbackDays * 86400000,
   });
 }

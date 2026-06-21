@@ -42,8 +42,13 @@ function maxLamport(...maps) {
 export async function runSyncCycle(deps) {
   const {
     transport, collect, apply, store, type = "bookmark", owns = () => true,
-    maxRemovals = null, allowLargeChange = false, keep = () => true,
+    maxRemovals = null, allowLargeChange = false, keep = () => true, mode = "sync",
   } = deps;
+  // Role modes: "sync" = two-way; "receive" = pull/apply only, never upload;
+  // "send" = upload local only, never apply remote.
+  const doCollect = mode !== "receive";
+  const doApply = mode !== "send";
+  const doPush = mode !== "receive";
   const deviceId = await store.getDeviceId();
   const baseline = await store.getBaseline();
   const storedLamport = await store.getLamport();
@@ -51,8 +56,8 @@ export async function runSyncCycle(deps) {
   // Optional transport preflight (e.g. agent/server protocol-compatibility check).
   if (typeof transport.preflight === "function") await transport.preflight();
 
-  // 1. Snapshot current local reality.
-  const items = await collect();
+  // 1. Snapshot current local reality (skipped entirely in receive-only mode).
+  const items = doCollect ? await collect() : [];
   /** @type {Record<string,string>} */
   const liveLocalHashes = {};
   for (const it of items) liveLocalHashes[it.id] = stableStringify(it.payload);
@@ -92,8 +97,9 @@ export async function runSyncCycle(deps) {
         : makeRecord({ id: it.id, type, deviceId, lamport: tick, payload: it.payload });
     }
     // Local deletes: items that were live in the baseline but are gone now —
-    // restricted to records this device owns (see `owns`).
-    for (const [id, rec] of Object.entries(baseline)) {
+    // restricted to records this device owns (see `owns`). Skipped in
+    // receive-only mode (we don't author changes there).
+    for (const [id, rec] of Object.entries(doCollect ? baseline : {})) {
       if (rec.deleted || liveLocalHashes[id] !== undefined) continue;
       if (!owns(rec, deviceId)) continue;
       if (!keep(rec)) continue; // excluded items aren't ours to delete
@@ -108,7 +114,8 @@ export async function runSyncCycle(deps) {
     }
 
     const { merged, toApply } = mergeState(remote, local, liveLocalHashes);
-    const applyList = toApply.filter((r) => keep(r)); // don't import excluded items
+    // don't import excluded items; import nothing at all in send-only mode
+    const applyList = doApply ? toApply.filter((r) => keep(r)) : [];
 
     // Large-change safeguard: pause before applying a lot of removals.
     if (maxRemovals != null && !allowLargeChange) {
@@ -118,14 +125,16 @@ export async function runSyncCycle(deps) {
 
     await apply(applyList);
 
-    try {
-      await transport.push(
-        { version: STATE_SCHEMA_VERSION, records: { ...otherTypes, ...merged }, updatedAt: Date.now() },
-        pulled.etag,
-      );
-    } catch (err) {
-      if (err instanceof ConcurrencyError && attempt < 3) continue; // re-pull, retry
-      throw err;
+    if (doPush) {
+      try {
+        await transport.push(
+          { version: STATE_SCHEMA_VERSION, records: { ...otherTypes, ...merged }, updatedAt: Date.now() },
+          pulled.etag,
+        );
+      } catch (err) {
+        if (err instanceof ConcurrencyError && attempt < 3) continue; // re-pull, retry
+        throw err;
+      }
     }
 
     await store.setLamport(tick);
