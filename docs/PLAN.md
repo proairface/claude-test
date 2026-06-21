@@ -138,12 +138,17 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - **Known scale caveat:** the whole-state blob grows with history; large-history
   delta sync + pruning is M6 work.
 
-## M6 — Hardening  (~2 days, optional/parallel)
-- Optional E2E encryption of the blob (passphrase).
-- Remote self-hosted server (same protocol, auth, TLS) as an alt to the agent.
-- Conflict/perf: large-history delta sync (`/changes?since=`), tombstone GC.
-- Packaging: signed `.xpi` (Firefox) and store-ready zip (Chromium), native
-  messaging host manifests + installers per OS for the agent.
+## M6 — Hardening & packaging  (mostly done)
+- ✅ E2E encryption of the blob (passphrase) — see M4.8.
+- ✅ Remote self-hosted server (same protocol, auth) — see M3.5.
+- ✅ **Packaging**: brand icons (16/32/48/128, `npm run icons`), polished
+  manifests (icons + metadata), `npm run package` → store-ready zips for both
+  Chrome and Firefox via `web-ext`, `npm run lint:firefox` (0 errors/warnings).
+  `docs/PUBLISHING.md`, `STORE.md` (listing + permission justifications),
+  `PRIVACY.md`, and agent service installers (`agent/install/` systemd +
+  launchd).
+- ⬜ **Still open (optional):** large-history delta sync (`/changes?since=`) +
+  tombstone GC; signed self-hosted `.xpi` + `update_url`.
 
 ### M6 (optional) — Chromium past-dated history via the agent
 The Chromium `history.addUrl` API can't set a past timestamp, so synced visits

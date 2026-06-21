@@ -37,6 +37,7 @@ await build({
 
 // Static assets + the target-specific manifest.
 await cp(resolve(here, "src/options/options.html"), resolve(dist, "options/options.html"));
+await cp(resolve(here, "icons"), resolve(dist, "icons"), { recursive: true });
 await copyFile(resolve(here, `manifest.${target}.json`), resolve(dist, "manifest.json"));
 
 console.log(`Built ${target} extension -> ${dist}`);
