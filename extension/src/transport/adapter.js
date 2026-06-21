@@ -10,6 +10,10 @@
  *   Store the merged state. Should use optimistic concurrency (If-Match) when
  *   the backend supports it and throw a ConcurrencyError on conflict.
  * @property {() => Promise<boolean>} health
+ * @property {() => Promise<void>} [preflight]
+ *   Optional. Called once at the start of a sync cycle to fail fast on an
+ *   unreachable/unauthorized/protocol-incompatible backend. Omit when the
+ *   transport has no such concept (e.g. WebDAV, browser storage).
  */
 
 export class ConcurrencyError extends Error {}

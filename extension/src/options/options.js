@@ -3,8 +3,10 @@
 // access), and trigger a sync.
 import browser from "../lib/browser.js";
 import { originsForConfig } from "../transport/index.js";
+import { listBackups } from "../state/backups.js";
 
 const CONFIG_KEY = "browsersync:config";
+const PENDING_KEY = "browsersync:pendingLargeChange";
 const $ = (id) => document.getElementById(id);
 const TEXT_FIELDS = ["webdavUrl", "webdavUser", "webdavPass", "baseUrl", "token", "deviceName"];
 
@@ -20,6 +22,11 @@ function readForm() {
     intervalValue: Number($("intervalValue").value) || 5,
     intervalUnit: $("intervalUnit").value,
     syncOnChange: $("syncOnChange").checked,
+    permissions: {
+      add: $("permAdd").checked, update: $("permUpdate").checked, remove: $("permRemove").checked,
+    },
+    confirmThreshold: Math.max(0, Number($("confirmThreshold").value) || 0),
+    backups: $("backups").checked,
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -41,6 +48,13 @@ async function loadConfig() {
   if (cfg.intervalValue != null) $("intervalValue").value = cfg.intervalValue;
   if (cfg.intervalUnit) $("intervalUnit").value = cfg.intervalUnit;
   if (cfg.syncOnChange != null) $("syncOnChange").checked = cfg.syncOnChange;
+  if (cfg.permissions) {
+    $("permAdd").checked = cfg.permissions.add !== false;
+    $("permUpdate").checked = cfg.permissions.update !== false;
+    $("permRemove").checked = cfg.permissions.remove !== false;
+  }
+  if (cfg.confirmThreshold != null) $("confirmThreshold").value = cfg.confirmThreshold;
+  if (cfg.backups != null) $("backups").checked = cfg.backups;
   updateVisibility();
 }
 
@@ -100,6 +114,57 @@ async function renderRemoteTabs() {
   }
 }
 
+// Show the "a sync was paused because it wanted to remove a lot" panel.
+async function renderPending() {
+  const box = $("pendingChange");
+  const pending = (await browser.storage.local.get(PENDING_KEY))[PENDING_KEY];
+  if (!pending) { box.style.display = "none"; box.textContent = ""; return; }
+  box.style.display = "";
+  box.textContent = `A sync was paused: it wanted to remove ${pending.count} ${pending.type} item(s) ` +
+    `(your limit is ${pending.limit}). Approve only if that's expected.`;
+  const approve = document.createElement("button");
+  approve.textContent = "Approve once & sync";
+  approve.style.marginLeft = ".5rem";
+  approve.addEventListener("click", async () => {
+    setStatus("Applying approved change…");
+    try {
+      const result = await browser.runtime.sendMessage({ type: "APPROVE_LARGE_CHANGE" });
+      setStatus(summarize(result));
+      await refreshPanels();
+    } catch (err) { setStatus(`Failed: ${err.message}`); }
+  });
+  box.appendChild(document.createElement("br"));
+  box.appendChild(approve);
+}
+
+async function renderBackups() {
+  const box = $("backupList");
+  const backups = await listBackups();
+  if (!backups.length) return; // keep the default hint
+  box.textContent = "";
+  const ul = document.createElement("ul");
+  for (const b of backups.sort((a, c) => c.ts - a.ts)) {
+    const li = document.createElement("li");
+    li.textContent = `${new Date(b.ts).toLocaleString()} — ${b.count} bookmarks  `;
+    const btn = document.createElement("button");
+    btn.textContent = "Restore (re-add)";
+    btn.addEventListener("click", async () => {
+      setStatus("Restoring backup…");
+      try {
+        const n = await browser.runtime.sendMessage({ type: "RESTORE_BACKUP", ts: b.ts });
+        setStatus(`Restore complete (${n} bookmarks re-added where missing).`);
+      } catch (err) { setStatus(`Restore failed: ${err.message}`); }
+    });
+    li.appendChild(btn);
+    ul.appendChild(li);
+  }
+  box.appendChild(ul);
+}
+
+async function refreshPanels() {
+  await Promise.all([renderRemoteTabs(), renderPending(), renderBackups()]);
+}
+
 document.addEventListener("change", () => {
   updateVisibility();
   saveConfig().catch((err) => setStatus(`Save failed: ${err.message}`));
@@ -114,10 +179,10 @@ $("syncNow").addEventListener("click", async () => {
     setStatus("Syncing…");
     const result = await browser.runtime.sendMessage({ type: "SYNC_NOW" });
     setStatus(summarize(result));
-    await renderRemoteTabs();
   } catch (err) {
     setStatus(`Sync failed: ${err.message}`);
   }
+  await refreshPanels();
 });
 
-loadConfig().then(renderRemoteTabs).catch((err) => setStatus(`Load failed: ${err.message}`));
+loadConfig().then(refreshPanels).catch((err) => setStatus(`Load failed: ${err.message}`));

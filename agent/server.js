@@ -19,6 +19,10 @@ import { dirname, basename, join } from "node:path";
 
 export const AGENT_VERSION = "0.1.0";
 
+// Major version of the wire protocol (GET/PUT /state semantics). Must match the
+// extension's PROTOCOL_VERSION; bump only on an incompatible protocol change.
+export const PROTOCOL_VERSION = 1;
+
 const DEFAULT_STATE = { version: 1, records: {}, updatedAt: 0 };
 
 function etagOf(raw) {
@@ -83,7 +87,7 @@ export function createAgentServer({ syncFile, token }) {
       const route = `${req.method} ${url.pathname}`;
 
       if (route === "GET /health") {
-        return sendJson(res, 200, { ok: true, version: AGENT_VERSION });
+        return sendJson(res, 200, { ok: true, version: AGENT_VERSION, protocol: PROTOCOL_VERSION });
       }
 
       if (route === "GET /state") {

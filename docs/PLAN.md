@@ -82,6 +82,34 @@ Repo structure, module interfaces, manifests, docs. No logic.
   near-instant updates come from the change-driven option, not tiny polling.
 - 5 new tests. 38 total.
 
+## M4.6 — Update & version safety ✅ (done)
+- Web stores are the intended channel (browsers auto-update). See
+  `docs/UPDATES.md` for the full policy.
+- **Cross-version guard:** the sync state carries a major `version`; a device
+  refuses to overwrite state from a newer schema major (`assertStateWritable` →
+  `IncompatibleStateError`) so an out-of-date device can't clobber newer data.
+- **Config migrations:** `migrateConfig` (pure, tested) + `runConfigMigrations`
+  on `onInstalled(update)`.
+- **Protocol version:** agent `/health` reports `protocol`; `isProtocolCompatible`
+  in the extension. 6 new tests. 44 total.
+
+## M4.7 — Safety & user control ✅ (done)
+- **Corruption guard:** `validateState` rejects state that parses but isn't
+  plausible (e.g. an empty/garbled file from a cloud conflict) so the engine
+  aborts instead of applying/overwriting it.
+- **Per-operation permissions:** Options checkboxes for what sync may do to this
+  browser — Add / Update / Remove independently (default all on). Enforced by a
+  pure `plannedAction` in the bookmark applier.
+- **Large-change safeguard:** a configurable threshold; if a sync would remove
+  more than N local items the cycle throws `LargeChangeError` and **does not
+  apply or push**. The options page surfaces a panel to "Approve once & sync"
+  (one-shot bypass).
+- **Automatic backups + restore:** before a sync removes any bookmark, snapshot
+  the current bookmarks (kept last 3, `unlimitedStorage`); the options page lists
+  backups with an additive "Restore (re-add)" action.
+- 9 new tests (validate, permissions, backup trim, large-change abort/bypass).
+  53 total.
+
 ## M5 — History sync  (~1.5 days)
 - `collectors/history.js`, `appliers/history.js` with capability branching.
 - Firefox: real `visitTime`. Chromium: documented current-time stamping.

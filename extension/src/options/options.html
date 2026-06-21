@@ -62,8 +62,31 @@
     </fieldset>
 
     <fieldset>
+      <legend>What sync may change in this browser</legend>
+      <label><input type="checkbox" id="permAdd" checked /> Add new entries</label>
+      <label><input type="checkbox" id="permUpdate" checked /> Update existing entries (e.g. titles)</label>
+      <label><input type="checkbox" id="permRemove" checked /> Remove entries deleted elsewhere</label>
+      <p class="hint">Uncheck "Remove" if you never want sync to delete your local bookmarks.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Safety</legend>
+      <label>Pause and ask if a sync would remove more than
+        <input id="confirmThreshold" type="number" min="0" step="1" value="200" style="width:5rem" /> items
+        <span class="hint">(0 = never pause)</span>
+      </label>
+      <label><input type="checkbox" id="backups" checked /> Back up bookmarks before a sync removes anything</label>
+      <div id="pendingChange" style="display:none; margin-top:.5rem; padding:.5rem; background:#fff6d5; border:1px solid #e6c200;"></div>
+    </fieldset>
+
+    <fieldset>
       <legend>Other devices' open tabs</legend>
       <div id="remoteTabs"><p class="hint">Enable "Open tabs" and sync to see tabs from your other devices here.</p></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Backups</legend>
+      <div id="backupList"><p class="hint">Backups are taken automatically before a sync removes bookmarks.</p></div>
     </fieldset>
 
     <fieldset>
