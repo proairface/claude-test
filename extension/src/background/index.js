@@ -40,7 +40,11 @@ const DEFAULT_CONFIG = {
 };
 
 async function getConfig() {
-  return { ...DEFAULT_CONFIG, ...((await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {}) };
+  const raw = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+  const activeProfile = raw.activeProfile ?? "default";
+  const profiles = raw.profiles ?? { default: raw }; // legacy flat config = default profile
+  const settings = profiles[activeProfile] ?? profiles.default ?? {};
+  return { ...DEFAULT_CONFIG, ...settings, _profileId: activeProfile };
 }
 async function getFlag(key) { return Boolean((await browser.storage.local.get(key))[key]); }
 async function consumeBypass() {
@@ -68,7 +72,7 @@ async function syncBookmarks(cfg, { dryRun = false } = {}) {
           add: perms.add !== false, update: perms.update !== false, remove: perms.remove !== false,
         });
       },
-      store: createStore("bookmark"),
+      store: createStore("bookmark", cfg._profileId),
       type: "bookmark",
       maxRemovals,
       allowLargeChange,
@@ -87,7 +91,7 @@ async function syncBookmarks(cfg, { dryRun = false } = {}) {
 }
 
 async function syncTabs(cfg, deviceId, { dryRun = false } = {}) {
-  const store = createStore("tab");
+  const store = createStore("tab", cfg._profileId);
   const filter = urlFilterFor(cfg);
   const result = await runSyncCycle({
     transport: createTransport(cfg),
@@ -126,7 +130,7 @@ async function syncHistory(cfg, deviceId, { dryRun = false } = {}) {
     transport: createTransport(cfg),
     collect: (since, knownIds, dev) => collectHistorySince(since, knownIds, dev, { filter }),
     apply: applyHistory,
-    store: createStore("visit"),
+    store: createStore("visit", cfg._profileId),
     type: "visit",
     keep: keepFor(cfg),
     mode: cfg.role ?? "sync",

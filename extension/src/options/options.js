@@ -37,11 +37,12 @@ function readForm() {
   return cfg;
 }
 
-async function loadConfig() {
-  const cfg = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+function fillForm(cfg = {}) {
   if (cfg.transport) {
     const r = document.querySelector(`input[name="transport"][value="${cfg.transport}"]`);
     if (r) r.checked = true;
+  } else {
+    document.querySelector('input[name="transport"][value="localAgent"]').checked = true;
   }
   for (const f of TEXT_FIELDS) if (cfg[f] != null) $(f).value = cfg[f];
   if (cfg.enabled) {
@@ -80,10 +81,40 @@ function updateVisibility() {
   $("historyGroup").style.display = $("syncHistory").checked ? "" : "none";
 }
 
+// Profile state: { activeProfile, profiles: { id: settings } }.
+let cfgState = { activeProfile: "default", profiles: { default: {} } };
+
+async function loadState() {
+  const raw = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
+  if (raw.profiles) {
+    cfgState = { activeProfile: raw.activeProfile ?? "default", profiles: raw.profiles };
+  } else {
+    cfgState = { activeProfile: "default", profiles: { default: raw } }; // migrate flat config
+  }
+  if (!cfgState.profiles[cfgState.activeProfile]) cfgState.activeProfile = Object.keys(cfgState.profiles)[0] ?? "default";
+}
+
+function renderProfiles() {
+  const sel = $("profileSelect");
+  sel.textContent = "";
+  for (const id of Object.keys(cfgState.profiles)) {
+    const o = document.createElement("option");
+    o.value = id; o.textContent = id;
+    if (id === cfgState.activeProfile) o.selected = true;
+    sel.appendChild(o);
+  }
+  $("profileDelete").disabled = cfgState.activeProfile === "default";
+}
+
+async function persistState() {
+  await browser.storage.local.set({ [CONFIG_KEY]: cfgState });
+}
+
 async function saveConfig() {
-  const cfg = readForm();
-  await browser.storage.local.set({ [CONFIG_KEY]: cfg });
-  return cfg;
+  const settings = readForm();
+  cfgState.profiles[cfgState.activeProfile] = settings;
+  await persistState();
+  return { ...settings, _profileId: cfgState.activeProfile };
 }
 
 // Ask for permission to talk to the configured endpoint, only when needed.
@@ -304,4 +335,45 @@ $("importFile").addEventListener("change", async (e) => {
   }
 });
 
-loadConfig().then(refreshPanels).catch((err) => setStatus(`Load failed: ${err.message}`));
+$("profileSelect").addEventListener("change", async () => {
+  cfgState.activeProfile = $("profileSelect").value;
+  await persistState();
+  fillForm(cfgState.profiles[cfgState.activeProfile] ?? {});
+  $("profileDelete").disabled = cfgState.activeProfile === "default";
+  setStatus(`Switched to profile "${cfgState.activeProfile}".`);
+  await refreshPanels();
+});
+
+$("profileNew").addEventListener("click", async () => {
+  const name = prompt("New profile name:")?.trim();
+  if (!name) return;
+  if (cfgState.profiles[name]) return setStatus("A profile with that name already exists.");
+  cfgState.profiles[name] = {};
+  cfgState.activeProfile = name;
+  await persistState();
+  renderProfiles();
+  fillForm({});
+  setStatus(`Created profile "${name}".`);
+  await refreshPanels();
+});
+
+$("profileDelete").addEventListener("click", async () => {
+  const id = cfgState.activeProfile;
+  if (id === "default") return;
+  if (!confirm(`Delete profile "${id}"? Its sync history bookkeeping is also cleared.`)) return;
+  delete cfgState.profiles[id];
+  cfgState.activeProfile = "default";
+  await persistState();
+  renderProfiles();
+  fillForm(cfgState.profiles.default ?? {});
+  setStatus(`Deleted profile "${id}".`);
+  await refreshPanels();
+});
+
+async function init() {
+  await loadState();
+  renderProfiles();
+  fillForm(cfgState.profiles[cfgState.activeProfile] ?? {});
+  await refreshPanels();
+}
+init().catch((err) => setStatus(`Load failed: ${err.message}`));

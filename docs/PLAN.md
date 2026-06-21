@@ -110,6 +110,21 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - 9 new tests (validate, permissions, backup trim, large-change abort/bypass).
   53 total.
 
+## M4.8 — Customization & power features ✅ (done)
+- **Export / Import**: portable `.json` snapshot for offline migration to a
+  fresh browser/OS (additive import). `state/portable.js`.
+- **Filters**: never-sync domain list (bookmarks/history/tabs); excluded items
+  are not collected, imported, or tombstoned. `model/filters.js`.
+- **Role modes**: per-device two-way / receive-only / send-only.
+- **Preview / dry-run**: compute and list what a sync would change, applying
+  nothing (engine `dryRun`; "Preview changes" button).
+- **Sync inspector**: read-only, searchable view of the shared state.
+- **End-to-end encryption**: passphrase → AES-GCM (PBKDF2) encrypting transport
+  wrapper; transports only see ciphertext. `transport/crypto.js`.
+- **Profiles**: multiple named sync sets (own transport/filters/keys and
+  isolated baselines); "default" keeps legacy keys. `state/storeKeys.js`.
+- 71 tests total.
+
 ## M5 — History sync ✅ (done)
 - `collectors/history.js` (incremental via watermark; skips ids already in the
   shared state for loop-safety) and `appliers/history.js` (capability branch:

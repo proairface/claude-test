@@ -17,6 +17,17 @@
     <h1>BrowserSync</h1>
 
     <fieldset>
+      <legend>Profile</legend>
+      <label>Active profile:
+        <select id="profileSelect"></select>
+      </label>
+      <button id="profileNew" type="button">New…</button>
+      <button id="profileDelete" type="button">Delete</button>
+      <p class="hint">Each profile is an independent sync set (its own transport/file, filters, keys, and
+        sync history) — e.g. "personal" and "work" pointing at different files.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>Transport</legend>
 
       <label><input type="radio" name="transport" value="webdav" /> WebDAV (no extra software — Nextcloud, NAS, …)</label>

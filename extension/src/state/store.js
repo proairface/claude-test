@@ -1,13 +1,14 @@
 // Persistence for sync bookkeeping, backed by browser.storage.local.
 //
-// Holds: a stable deviceId, the device's Lamport clock, and the per-type
-// "baseline" (last cycle's merged record map) used for change/delete detection.
+// Holds: a stable deviceId, the device's Lamport clock, the per-type "baseline"
+// (last cycle's merged record map), and the history watermark. Baseline/
+// watermark/lamport are namespaced per PROFILE so multiple named sync sets (work
+// vs personal, different files) never cross-contaminate. The "default" profile
+// uses the original un-prefixed keys for backward compatibility.
 import browser from "../lib/browser.js";
+import { keyLamport, keyBaseline, keyWatermark } from "./storeKeys.js";
 
 const KEY_DEVICE = "browsersync:deviceId";
-const KEY_LAMPORT = "browsersync:lamport";
-const keyBaseline = (type) => `browsersync:baseline:${type}`;
-const keyWatermark = (type) => `browsersync:watermark:${type}`;
 
 async function get(key, fallback) {
   const out = await browser.storage.local.get(key);
@@ -18,11 +19,11 @@ async function set(key, value) {
 }
 
 /**
- * Build a store bound to a record `type` (so bookmarks/tabs/history each keep
- * their own baseline) while sharing one deviceId and Lamport clock.
+ * Build a store bound to a record `type` and a `profileId`.
  * @param {string} type
+ * @param {string} [profileId]
  */
-export function createStore(type) {
+export function createStore(type, profileId = "default") {
   return {
     async getDeviceId() {
       let id = await get(KEY_DEVICE, null);
@@ -32,12 +33,11 @@ export function createStore(type) {
       }
       return id;
     },
-    getLamport: () => get(KEY_LAMPORT, 0),
-    setLamport: (n) => set(KEY_LAMPORT, n),
-    getBaseline: () => get(keyBaseline(type), {}),
-    setBaseline: (map) => set(keyBaseline(type), map),
-    // Incremental collection cursor (used by append-only history sync).
-    getWatermark: () => get(keyWatermark(type), null),
-    setWatermark: (ms) => set(keyWatermark(type), ms),
+    getLamport: () => get(keyLamport(profileId), 0),
+    setLamport: (n) => set(keyLamport(profileId), n),
+    getBaseline: () => get(keyBaseline(type, profileId), {}),
+    setBaseline: (map) => set(keyBaseline(type, profileId), map),
+    getWatermark: () => get(keyWatermark(type, profileId), null),
+    setWatermark: (ms) => set(keyWatermark(type, profileId), ms),
   };
 }
