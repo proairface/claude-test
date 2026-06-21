@@ -4,6 +4,7 @@
 import browser from "../lib/browser.js";
 import { originsForConfig } from "../transport/index.js";
 import { listBackups } from "../state/backups.js";
+import { parseDomainList } from "../model/filters.js";
 
 const CONFIG_KEY = "browsersync:config";
 const PENDING_KEY = "browsersync:pendingLargeChange";
@@ -28,6 +29,7 @@ function readForm() {
     confirmThreshold: Math.max(0, Number($("confirmThreshold").value) || 0),
     backups: $("backups").checked,
     historyLookbackDays: Math.max(1, Number($("historyLookbackDays").value) || 90),
+    filters: { excludeDomains: parseDomainList($("excludeDomains").value) },
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -57,6 +59,7 @@ async function loadConfig() {
   if (cfg.confirmThreshold != null) $("confirmThreshold").value = cfg.confirmThreshold;
   if (cfg.backups != null) $("backups").checked = cfg.backups;
   if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
+  if (cfg.filters?.excludeDomains) $("excludeDomains").value = cfg.filters.excludeDomains.join("\n");
   updateVisibility();
 }
 

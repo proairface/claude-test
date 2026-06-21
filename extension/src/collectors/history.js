@@ -18,10 +18,12 @@ const DEFAULT_MAX_RESULTS = 5000;
  */
 export async function collectHistorySince(sinceMs, knownIds, deviceId, opts = {}) {
   const maxResults = opts.maxResults ?? DEFAULT_MAX_RESULTS;
+  const filter = opts.filter ?? (() => true);
   const results = await browser.history.search({ text: "", startTime: sinceMs, maxResults });
   const out = [];
   for (const r of results) {
     if (!r.url || !SYNCABLE.test(r.url)) continue;
+    if (!filter(r.url)) continue; // excluded by user filters
     let visits = [];
     try {
       visits = await browser.history.getVisits({ url: r.url });

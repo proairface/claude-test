@@ -42,7 +42,7 @@ function maxLamport(...maps) {
 export async function runSyncCycle(deps) {
   const {
     transport, collect, apply, store, type = "bookmark", owns = () => true,
-    maxRemovals = null, allowLargeChange = false,
+    maxRemovals = null, allowLargeChange = false, keep = () => true,
   } = deps;
   const deviceId = await store.getDeviceId();
   const baseline = await store.getBaseline();
@@ -96,6 +96,7 @@ export async function runSyncCycle(deps) {
     for (const [id, rec] of Object.entries(baseline)) {
       if (rec.deleted || liveLocalHashes[id] !== undefined) continue;
       if (!owns(rec, deviceId)) continue;
+      if (!keep(rec)) continue; // excluded items aren't ours to delete
       local[id] = makeRecord({
         id,
         type: rec.type,
@@ -107,14 +108,15 @@ export async function runSyncCycle(deps) {
     }
 
     const { merged, toApply } = mergeState(remote, local, liveLocalHashes);
+    const applyList = toApply.filter((r) => keep(r)); // don't import excluded items
 
     // Large-change safeguard: pause before applying a lot of removals.
     if (maxRemovals != null && !allowLargeChange) {
-      const removals = toApply.reduce((n, r) => n + (r.deleted ? 1 : 0), 0);
+      const removals = applyList.reduce((n, r) => n + (r.deleted ? 1 : 0), 0);
       if (removals > maxRemovals) throw new LargeChangeError(removals, maxRemovals, type);
     }
 
-    await apply(toApply);
+    await apply(applyList);
 
     try {
       await transport.push(
@@ -128,6 +130,6 @@ export async function runSyncCycle(deps) {
 
     await store.setLamport(tick);
     await store.setBaseline(merged); // baseline holds only this type's records
-    return { applied: toApply.length, total: Object.keys(merged).length };
+    return { applied: applyList.length, total: Object.keys(merged).length };
   }
 }

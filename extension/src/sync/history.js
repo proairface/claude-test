@@ -28,7 +28,7 @@ function maxLamport(...maps) {
  * @returns {Promise<{applied:number,total:number}>}
  */
 export async function runHistorySync(deps) {
-  const { transport, collect, apply, store, type = "visit" } = deps;
+  const { transport, collect, apply, store, type = "visit", keep = () => true } = deps;
   const deviceId = await store.getDeviceId();
   if (typeof transport.preflight === "function") await transport.preflight();
 
@@ -75,6 +75,7 @@ export async function runHistorySync(deps) {
       if (rec.deleted) continue;
       if (baseline[id]) continue;
       if (rec.payload?.ownerDevice === deviceId) continue;
+      if (!keep(rec)) continue; // excluded by user filters
       toApply.push(rec);
     }
 

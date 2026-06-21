@@ -77,6 +77,14 @@
     </fieldset>
 
     <fieldset>
+      <legend>Filters (privacy)</legend>
+      <label>Never sync these domains (bookmarks, history, tabs):</label>
+      <textarea id="excludeDomains" rows="3" style="width:100%; box-sizing:border-box"
+        placeholder="one per line, e.g.&#10;bank.example.com&#10;health.example"></textarea>
+      <p class="hint">Matches the domain and its subdomains. Already-synced entries on other devices aren't removed.</p>
+    </fieldset>
+
+    <fieldset>
       <legend>Safety</legend>
       <label>Pause and ask if a sync would remove more than
         <input id="confirmThreshold" type="number" min="0" step="1" value="200" style="width:5rem" /> items

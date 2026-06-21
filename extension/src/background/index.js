@@ -21,6 +21,13 @@ import { runConfigMigrations } from "../state/migrate.js";
 import { LargeChangeError } from "../model/validate.js";
 import { backupBookmarks, restoreBackup } from "../state/backups.js";
 import { buildSnapshot, parseSnapshot, recordsByType } from "../state/portable.js";
+import { makeUrlFilter } from "../model/filters.js";
+
+const urlFilterFor = (cfg) => makeUrlFilter(cfg.filters);
+const keepFor = (cfg) => {
+  const f = urlFilterFor(cfg);
+  return (rec) => { const u = rec.payload?.url; return u ? f(u) : true; };
+};
 
 const SYNC_ALARM = "browsersync:cycle";
 const CONFIG_KEY = "browsersync:config";
@@ -48,10 +55,12 @@ async function syncBookmarks(cfg) {
   const threshold = Number(cfg.confirmThreshold);
   const maxRemovals = Number.isFinite(threshold) && threshold > 0 ? threshold : null;
   const allowLargeChange = await consumeBypass();
+  const filter = urlFilterFor(cfg);
   try {
     const res = await runSyncCycle({
       transport: createTransport(cfg),
-      collect: collectBookmarks,
+      collect: () => collectBookmarks(filter),
+      keep: keepFor(cfg),
       apply: async (recs) => {
         if (cfg.backups !== false && recs.some((r) => r.deleted)) await backupBookmarks();
         await applyBookmarks(recs, {
@@ -77,13 +86,15 @@ async function syncBookmarks(cfg) {
 
 async function syncTabs(cfg, deviceId) {
   const store = createStore("tab");
+  const filter = urlFilterFor(cfg);
   const result = await runSyncCycle({
     transport: createTransport(cfg),
-    collect: () => collectTabs(deviceId, cfg.deviceName ?? ""),
+    collect: () => collectTabs(deviceId, cfg.deviceName ?? "", filter),
     apply: applyTabs,
     store,
     type: "tab",
     owns: (rec, self) => rec.payload?.ownerDevice === self,
+    keep: keepFor(cfg),
   });
   await cacheRemoteTabs(store, deviceId);
   return result;
@@ -106,12 +117,14 @@ async function cacheRemoteTabs(store, deviceId) {
 
 async function syncHistory(cfg, deviceId) {
   const lookbackDays = Number(cfg.historyLookbackDays) > 0 ? Number(cfg.historyLookbackDays) : 90;
+  const filter = urlFilterFor(cfg);
   return runHistorySync({
     transport: createTransport(cfg),
-    collect: (since, knownIds, dev) => collectHistorySince(since, knownIds, dev),
+    collect: (since, knownIds, dev) => collectHistorySince(since, knownIds, dev, { filter }),
     apply: applyHistory,
     store: createStore("visit"),
     type: "visit",
+    keep: keepFor(cfg),
     initialWatermark: Date.now() - lookbackDays * 86400000,
   });
 }

@@ -14,11 +14,12 @@ const SYNCABLE = /^(https?|ftp|file):/i;
  * @param {string} [deviceName] friendly label shown in other devices' UI
  * @returns {Promise<Array<{id:string,payload:object}>>}
  */
-export async function collectTabs(deviceId, deviceName = "") {
+export async function collectTabs(deviceId, deviceName = "", filter = () => true) {
   const tabs = await browser.tabs.query({});
   const out = [];
   for (const t of tabs) {
     if (!t.url || !SYNCABLE.test(t.url)) continue;
+    if (!filter(t.url)) continue; // excluded by user filters
     const payload = {
       url: t.url,
       title: t.title ?? "",
