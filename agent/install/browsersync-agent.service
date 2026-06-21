@@ -1,0 +1,24 @@
+# BrowserSync agent — systemd user service (Linux).
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp browsersync-agent.service ~/.config/systemd/user/
+#   # edit the paths/env below, then:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now browsersync-agent
+#
+# Uses the config written by setup.sh (agent/browsersync.env). Adjust paths.
+
+[Unit]
+Description=BrowserSync local sync agent
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/browsersync/agent
+EnvironmentFile=%h/browsersync/agent/browsersync.env
+ExecStart=/usr/bin/env node index.js
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

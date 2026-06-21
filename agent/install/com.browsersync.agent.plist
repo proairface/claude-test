@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BrowserSync agent — launchd agent (macOS).
+
+  Install:
+    cp com.browsersync.agent.plist ~/Library/LaunchAgents/
+    # edit the paths/env below to match your install, then:
+    launchctl load ~/Library/LaunchAgents/com.browsersync.agent.plist
+
+  Adjust the WorkingDirectory, node path (`which node`), and env values.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>com.browsersync.agent</string>
+  <key>WorkingDirectory</key> <string>/Users/CHANGEME/browsersync/agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>index.js</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key>      <string>8787</string>
+    <key>SYNC_FILE</key> <string>/Users/CHANGEME/Library/CloudStorage/…/browsersync/state.json</string>
+    <key>TOKEN</key>     <string>CHANGEME</string>
+  </dict>
+  <key>RunAtLoad</key>    <true/>
+  <key>KeepAlive</key>    <true/>
+</dict>
+</plist>

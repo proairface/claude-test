@@ -11,9 +11,11 @@ APIs, so the browser treats imported activity the same as local activity.
 > local agent, browser storage**, configurable + event-driven scheduling,
 > update/version safety, and a safety & control layer (corruption guard,
 > add/update/remove permissions, large-change pause, backups/restore). 56
-> passing tests including real two-device end-to-end syncs. See
-> [`docs/PLAN.md`](docs/PLAN.md); remaining: M6 hardening (encryption, packaging,
-> large-history delta sync).
+> passing tests including real two-device end-to-end syncs, plus end-to-end
+> encryption, filters, role modes, dry-run preview, a sync inspector, profiles,
+> and **store-ready packaging** (`npm run package`). See
+> [`docs/PLAN.md`](docs/PLAN.md) and [`docs/PUBLISHING.md`](docs/PUBLISHING.md).
+> Remaining (optional): large-history delta sync.
 >
 > **No extra software?** Pick the **WebDAV** transport in Options — the
 > extension talks to your WebDAV server (Nextcloud/NAS) directly, so Node/the

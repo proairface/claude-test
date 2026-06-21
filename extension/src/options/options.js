@@ -285,7 +285,10 @@ $("previewBtn").addEventListener("click", async () => {
     } else {
       for (const [type, p] of entries) {
         const h = document.createElement("div");
-        h.innerHTML = `<strong>${type}</strong>: +${p.addCount} add/update, −${p.removeCount} remove`;
+        const strong = document.createElement("strong");
+        strong.textContent = type;
+        h.appendChild(strong);
+        h.appendChild(document.createTextNode(`: +${p.addCount} add/update, −${p.removeCount} remove`));
         box.appendChild(h);
         for (const u of p.remove.slice(0, 20)) {
           const d = document.createElement("div"); d.textContent = `− ${u}`; d.style.color = "#a00"; box.appendChild(d);
