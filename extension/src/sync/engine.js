@@ -43,6 +43,7 @@ export async function runSyncCycle(deps) {
   const {
     transport, collect, apply, store, type = "bookmark", owns = () => true,
     maxRemovals = null, allowLargeChange = false, keep = () => true, mode = "sync",
+    dryRun = false,
   } = deps;
   // Role modes: "sync" = two-way; "receive" = pull/apply only, never upload;
   // "send" = upload local only, never apply remote.
@@ -116,6 +117,9 @@ export async function runSyncCycle(deps) {
     const { merged, toApply } = mergeState(remote, local, liveLocalHashes);
     // don't import excluded items; import nothing at all in send-only mode
     const applyList = doApply ? toApply.filter((r) => keep(r)) : [];
+
+    // Dry run: report what would change locally; touch nothing.
+    if (dryRun) return { applied: 0, total: Object.keys(merged).length, changes: applyList };
 
     // Large-change safeguard: pause before applying a lot of removals.
     if (maxRemovals != null && !allowLargeChange) {

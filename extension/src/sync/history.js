@@ -28,7 +28,7 @@ function maxLamport(...maps) {
  * @returns {Promise<{applied:number,total:number}>}
  */
 export async function runHistorySync(deps) {
-  const { transport, collect, apply, store, type = "visit", keep = () => true, mode = "sync" } = deps;
+  const { transport, collect, apply, store, type = "visit", keep = () => true, mode = "sync", dryRun = false } = deps;
   const doCollect = mode !== "receive";
   const doApply = mode !== "send";
   const doPush = mode !== "receive";
@@ -81,6 +81,8 @@ export async function runHistorySync(deps) {
       if (!keep(rec)) continue; // excluded by user filters
       toApply.push(rec);
     }
+
+    if (dryRun) return { applied: 0, total: Object.keys(merged).length, changes: toApply };
 
     await apply(doApply ? toApply : []);
 

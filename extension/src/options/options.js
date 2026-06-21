@@ -194,6 +194,39 @@ $("syncNow").addEventListener("click", async () => {
   await refreshPanels();
 });
 
+$("previewBtn").addEventListener("click", async () => {
+  const cfg = await saveConfig();
+  setStatus("Computing preview…");
+  const box = $("preview");
+  try {
+    const granted = await ensurePermission(cfg);
+    if (!granted) return setStatus("Permission denied for that endpoint.");
+    const preview = await browser.runtime.sendMessage({ type: "PREVIEW_SYNC" });
+    box.textContent = "";
+    const entries = Object.entries(preview);
+    const total = entries.reduce((n, [, p]) => n + p.addCount + p.removeCount, 0);
+    if (total === 0) {
+      box.textContent = "No changes — everything is already in sync.";
+    } else {
+      for (const [type, p] of entries) {
+        const h = document.createElement("div");
+        h.innerHTML = `<strong>${type}</strong>: +${p.addCount} add/update, −${p.removeCount} remove`;
+        box.appendChild(h);
+        for (const u of p.remove.slice(0, 20)) {
+          const d = document.createElement("div"); d.textContent = `− ${u}`; d.style.color = "#a00"; box.appendChild(d);
+        }
+        for (const u of p.add.slice(0, 20)) {
+          const d = document.createElement("div"); d.textContent = `+ ${u}`; d.style.color = "#070"; box.appendChild(d);
+        }
+      }
+    }
+    box.style.display = "";
+    setStatus("Preview ready (nothing applied).");
+  } catch (err) {
+    setStatus(`Preview failed: ${err.message}`);
+  }
+});
+
 $("exportBtn").addEventListener("click", async () => {
   setStatus("Building export…");
   try {
