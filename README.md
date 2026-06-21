@@ -5,12 +5,15 @@ A cross-browser extension that synchronizes **bookmarks**, **open tabs**, and
 Edge, Chromium). Synced entries are written back using each browser's native
 APIs, so the browser treats imported activity the same as local activity.
 
-> **Status: M1 + M2 + M3 + pluggable transports implemented.** Build harness,
-> bookmarks two-way sync (tested CRDT engine), the local sync agent, and
-> **multiple transports — WebDAV (no host software), self-hosted server, local
-> agent, browser storage** — all work, with 30 passing tests including real
-> end-to-end two-device syncs over both the agent and WebDAV. Tabs (M4) and
-> history (M5) are still stubs. See [`docs/PLAN.md`](docs/PLAN.md).
+> **Status: bookmarks, tabs, and history sync all implemented.** Build harness,
+> bookmarks two-way sync, open-tabs (per-device, list-only), append-only history
+> sync, **multiple transports — WebDAV (no host software), self-hosted server,
+> local agent, browser storage**, configurable + event-driven scheduling,
+> update/version safety, and a safety & control layer (corruption guard,
+> add/update/remove permissions, large-change pause, backups/restore). 56
+> passing tests including real two-device end-to-end syncs. See
+> [`docs/PLAN.md`](docs/PLAN.md); remaining: M6 hardening (encryption, packaging,
+> large-history delta sync).
 >
 > **No extra software?** Pick the **WebDAV** transport in Options — the
 > extension talks to your WebDAV server (Nextcloud/NAS) directly, so Node/the

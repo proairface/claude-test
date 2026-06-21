@@ -41,7 +41,14 @@
       <legend>What to sync</legend>
       <label><input type="checkbox" id="syncBookmarks" checked /> Bookmarks</label>
       <label><input type="checkbox" id="syncTabs" /> Open tabs</label>
-      <label><input type="checkbox" id="syncHistory" /> History <span class="hint">(coming soon)</span></label>
+      <label><input type="checkbox" id="syncHistory" /> History (append-only; never deletes)</label>
+      <div class="group" id="historyGroup">
+        <label>Sync visits from the last
+          <input id="historyLookbackDays" type="number" min="1" step="1" value="90" style="width:5rem" /> days
+        </label>
+        <p class="hint">Firefox keeps original visit dates; Chromium stamps imported visits at sync time
+          (a browser limitation). History is only ever added, never removed.</p>
+      </div>
     </fieldset>
 
     <fieldset>

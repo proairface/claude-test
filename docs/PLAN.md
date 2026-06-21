@@ -110,12 +110,18 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - 9 new tests (validate, permissions, backup trim, large-change abort/bypass).
   53 total.
 
-## M5 — History sync  (~1.5 days)
-- `collectors/history.js`, `appliers/history.js` with capability branching.
-- Firefox: real `visitTime`. Chromium: documented current-time stamping.
-- Incremental collection via watermark to avoid re-scanning full history.
-- **Done when:** a week of Firefox history shows up (correct dates) in Firefox
-  on another machine, and appears (sync-dated) on Brave.
+## M5 — History sync ✅ (done)
+- `collectors/history.js` (incremental via watermark; skips ids already in the
+  shared state for loop-safety) and `appliers/history.js` (capability branch:
+  Firefox sets real `visitTime`, Chromium stamps insert-time).
+- `sync/history.js`: a dedicated **append-only** path — history is added, never
+  tombstoned, so clearing history on one device can't wipe it everywhere.
+- Options: enable History + a "last N days" lookback; honest note about the
+  Chromium timestamp limitation.
+- 3 new tests (propagation + idempotency, append-only/no-delete, no runaway
+  re-import). 56 total.
+- **Known scale caveat:** the whole-state blob grows with history; large-history
+  delta sync + pruning is M6 work.
 
 ## M6 — Hardening  (~2 days, optional/parallel)
 - Optional E2E encryption of the blob (passphrase).

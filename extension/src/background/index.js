@@ -11,6 +11,9 @@ import { collectBookmarks } from "../collectors/bookmarks.js";
 import { applyBookmarks } from "../appliers/bookmarks.js";
 import { collectTabs } from "../collectors/tabs.js";
 import { applyTabs } from "../appliers/tabs.js";
+import { collectHistorySince } from "../collectors/history.js";
+import { applyHistory } from "../appliers/history.js";
+import { runHistorySync } from "../sync/history.js";
 import { createStore } from "../state/store.js";
 import { createTransport } from "../transport/index.js";
 import { periodForConfig } from "../sync/schedule.js";
@@ -100,6 +103,18 @@ async function cacheRemoteTabs(store, deviceId) {
   await browser.storage.local.set({ [REMOTE_TABS_KEY]: byDevice });
 }
 
+async function syncHistory(cfg, deviceId) {
+  const lookbackDays = Number(cfg.historyLookbackDays) > 0 ? Number(cfg.historyLookbackDays) : 90;
+  return runHistorySync({
+    transport: createTransport(cfg),
+    collect: (since, knownIds, dev) => collectHistorySince(since, knownIds, dev),
+    apply: applyHistory,
+    store: createStore("visit"),
+    type: "visit",
+    initialWatermark: Date.now() - lookbackDays * 86400000,
+  });
+}
+
 async function syncEnabled() {
   const cfg = await getConfig();
   const enabled = cfg.enabled ?? { bookmarks: true };
@@ -107,6 +122,7 @@ async function syncEnabled() {
   const summary = {};
   if (enabled.bookmarks !== false) summary.bookmark = await syncBookmarks(cfg);
   if (enabled.tabs) summary.tab = await syncTabs(cfg, deviceId);
+  if (enabled.history) summary.visit = await syncHistory(cfg, deviceId);
   return summary;
 }
 

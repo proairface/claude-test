@@ -27,6 +27,7 @@ function readForm() {
     },
     confirmThreshold: Math.max(0, Number($("confirmThreshold").value) || 0),
     backups: $("backups").checked,
+    historyLookbackDays: Math.max(1, Number($("historyLookbackDays").value) || 90),
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -55,6 +56,7 @@ async function loadConfig() {
   }
   if (cfg.confirmThreshold != null) $("confirmThreshold").value = cfg.confirmThreshold;
   if (cfg.backups != null) $("backups").checked = cfg.backups;
+  if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
   updateVisibility();
 }
 
@@ -65,6 +67,7 @@ function updateVisibility() {
     g.style.display = applies ? "" : "none";
   }
   $("intervalGroup").style.display = $("autoSync").checked ? "" : "none";
+  $("historyGroup").style.display = $("syncHistory").checked ? "" : "none";
 }
 
 async function saveConfig() {
@@ -88,6 +91,7 @@ function summarize(result) {
   const parts = [];
   if (result?.bookmark) parts.push(`bookmarks: applied ${result.bookmark.applied}`);
   if (result?.tab) parts.push(`tabs: applied ${result.tab.applied}`);
+  if (result?.visit) parts.push(`history: applied ${result.visit.applied}`);
   return parts.length ? `Synced (${parts.join("; ")}).` : "Synced.";
 }
 

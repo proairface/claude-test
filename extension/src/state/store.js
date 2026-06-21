@@ -7,6 +7,7 @@ import browser from "../lib/browser.js";
 const KEY_DEVICE = "browsersync:deviceId";
 const KEY_LAMPORT = "browsersync:lamport";
 const keyBaseline = (type) => `browsersync:baseline:${type}`;
+const keyWatermark = (type) => `browsersync:watermark:${type}`;
 
 async function get(key, fallback) {
   const out = await browser.storage.local.get(key);
@@ -35,5 +36,8 @@ export function createStore(type) {
     setLamport: (n) => set(KEY_LAMPORT, n),
     getBaseline: () => get(keyBaseline(type), {}),
     setBaseline: (map) => set(keyBaseline(type), map),
+    // Incremental collection cursor (used by append-only history sync).
+    getWatermark: () => get(keyWatermark(type), null),
+    setWatermark: (ms) => set(keyWatermark(type), ms),
   };
 }
