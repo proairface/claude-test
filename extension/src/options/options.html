@@ -105,6 +105,14 @@
     </fieldset>
 
     <fieldset>
+      <legend>Sync inspector</legend>
+      <button id="inspectLoad" type="button">Load shared data</button>
+      <input id="inspectSearch" type="search" placeholder="filter by url / title / device…" style="width:60%" />
+      <div id="inspectCounts" class="hint"></div>
+      <div id="inspectResults" style="max-height:16rem; overflow:auto; font:12px/1.4 monospace"></div>
+    </fieldset>
+
+    <fieldset>
       <legend>Export / Import (offline migration)</legend>
       <p class="hint">Carry your data to a fresh browser with no server: export a file here,
         then import it on the new machine. Import only ever adds.</p>

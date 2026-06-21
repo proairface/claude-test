@@ -194,6 +194,45 @@ $("syncNow").addEventListener("click", async () => {
   await refreshPanels();
 });
 
+let inspectRows = [];
+function renderInspect() {
+  const q = $("inspectSearch").value.trim().toLowerCase();
+  const box = $("inspectResults");
+  const matches = !q
+    ? inspectRows
+    : inspectRows.filter((r) =>
+        (r.url + " " + r.title + " " + r.device).toLowerCase().includes(q));
+  box.textContent = "";
+  for (const r of matches.slice(0, 500)) {
+    const d = document.createElement("div");
+    d.textContent = `[${r.type}] ${r.title || r.url} — ${r.url} (${r.device})`;
+    box.appendChild(d);
+  }
+  if (matches.length > 500) {
+    const more = document.createElement("div");
+    more.className = "hint";
+    more.textContent = `…and ${matches.length - 500} more (refine the filter)`;
+    box.appendChild(more);
+  }
+}
+$("inspectLoad").addEventListener("click", async () => {
+  const cfg = await saveConfig();
+  setStatus("Loading shared data…");
+  try {
+    if (!(await ensurePermission(cfg))) return setStatus("Permission denied for that endpoint.");
+    const res = await browser.runtime.sendMessage({ type: "INSPECT_STATE" });
+    inspectRows = res.rows;
+    $("inspectCounts").textContent =
+      `${res.total} live records — ` +
+      Object.entries(res.counts).map(([t, c]) => `${t}: ${c}`).join(", ");
+    renderInspect();
+    setStatus("Loaded.");
+  } catch (err) {
+    setStatus(`Inspect failed: ${err.message}`);
+  }
+});
+$("inspectSearch").addEventListener("input", renderInspect);
+
 $("previewBtn").addEventListener("click", async () => {
   const cfg = await saveConfig();
   setStatus("Computing preview…");

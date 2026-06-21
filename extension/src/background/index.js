@@ -162,6 +162,27 @@ async function previewSync() {
   return out;
 }
 
+// --- inspector: read the shared sync state (read-only) ----------------------
+async function inspectState() {
+  const cfg = await getConfig();
+  const pulled = await createTransport(cfg).pull();
+  const records = pulled.state?.records ?? {};
+  const rows = [];
+  const counts = {};
+  for (const rec of Object.values(records)) {
+    const type = rec.type ?? "bookmark";
+    counts[type] = (counts[type] ?? 0) + 1;
+    if (rec.deleted) continue;
+    rows.push({
+      type,
+      url: rec.payload?.url ?? "",
+      title: rec.payload?.title ?? "",
+      device: rec.payload?.deviceName || rec.deviceId || "",
+    });
+  }
+  return { counts, total: rows.length, rows };
+}
+
 // --- portable export / import (offline migration) ---------------------------
 async function exportSnapshot() {
   const cfg = await getConfig();
@@ -254,6 +275,8 @@ browser.runtime.onMessage.addListener((msg) => {
       return browser.storage.local.set({ [BYPASS_KEY]: true }).then(runSync);
     case "RESTORE_BACKUP":
       return restoreBackup(msg.ts);
+    case "INSPECT_STATE":
+      return inspectState();
     case "EXPORT_DATA":
       return exportSnapshot();
     case "IMPORT_DATA":
