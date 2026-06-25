@@ -211,13 +211,35 @@ async function importSnapshot(text) {
   return { bookmark: bookmarks.length, visit: visits.length };
 }
 
+// --- status + toolbar badge -------------------------------------------------
+const STATUS_KEY = "browsersync:status";
+async function recordStatus(st) {
+  await browser.storage.local.set({ [STATUS_KEY]: st });
+  try {
+    if (browser.action?.setBadgeText) {
+      await browser.action.setBadgeText({ text: st.ok ? "" : "!" });
+      if (!st.ok && browser.action.setBadgeBackgroundColor) {
+        await browser.action.setBadgeBackgroundColor({ color: "#c0392b" });
+      }
+    }
+  } catch { /* action API may be unavailable in some contexts */ }
+}
+
 // --- coalescing lock --------------------------------------------------------
 let inFlight = null;
 function runSync() {
   if (inFlight) return inFlight;
   inFlight = syncEnabled()
-    .then((s) => { console.log("[BrowserSync] synced", s); return s; })
-    .catch((err) => { console.warn("[BrowserSync] sync stopped:", err.message); throw err; })
+    .then(async (s) => {
+      console.log("[BrowserSync] synced", s);
+      await recordStatus({ ok: true, ts: Date.now(), summary: s });
+      return s;
+    })
+    .catch(async (err) => {
+      console.warn("[BrowserSync] sync stopped:", err.message);
+      await recordStatus({ ok: false, ts: Date.now(), error: err.message });
+      throw err;
+    })
     .finally(() => { inFlight = null; });
   return inFlight;
 }
