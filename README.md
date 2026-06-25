@@ -1,5 +1,7 @@
 # BrowserSync (working title)
 
+[![CI](https://github.com/proairface/claude-test/actions/workflows/ci.yml/badge.svg)](https://github.com/proairface/claude-test/actions/workflows/ci.yml)
+
 A cross-browser extension that synchronizes **bookmarks**, **open tabs**, and
 **history** between Firefox and Chromium-based browsers (Chrome, Brave, Vivaldi,
 Edge, Chromium). Synced entries are written back using each browser's native
