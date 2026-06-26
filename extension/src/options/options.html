@@ -91,8 +91,10 @@
       <legend>Encryption</legend>
       <label><input type="checkbox" id="encEnabled" /> Encrypt synced data with a passphrase (end-to-end)</label>
       <label>Passphrase: <input id="encPassphrase" type="password" autocomplete="new-password" /></label>
+      <label><input type="checkbox" id="encSessionOnly" /> Keep passphrase only in memory (never written to disk; re-enter after a browser restart)</label>
       <p class="hint">The transport (WebDAV/cloud/agent) only ever sees ciphertext. Enter the SAME passphrase on
-        every device. ⚠️ If you lose it, the data is unrecoverable — keep an unencrypted export somewhere safe.</p>
+        every device. ⚠️ If you lose it, the data is unrecoverable — keep an unencrypted export somewhere safe.
+        Memory-only is more secure but pauses background sync until you re-enter it each browser session.</p>
     </fieldset>
 
     <fieldset>

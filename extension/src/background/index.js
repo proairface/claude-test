@@ -39,11 +39,26 @@ const DEFAULT_CONFIG = {
   permissions: { add: true, update: true, remove: true }, confirmThreshold: 200, backups: true,
 };
 
+const sessionPassKey = (profileId) => `browsersync:passphrase:${profileId}`;
+async function getSessionPassphrase(profileId) {
+  try {
+    return (await browser.storage.session?.get(sessionPassKey(profileId)))?.[sessionPassKey(profileId)];
+  } catch {
+    return undefined; // storage.session unavailable
+  }
+}
+
 async function getConfig() {
   const raw = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] ?? {};
   const activeProfile = raw.activeProfile ?? "default";
   const profiles = raw.profiles ?? { default: raw }; // legacy flat config = default profile
-  const settings = profiles[activeProfile] ?? profiles.default ?? {};
+  let settings = profiles[activeProfile] ?? profiles.default ?? {};
+  // Session-only passphrase: pulled from in-memory storage.session, never disk.
+  const enc = settings.encryption ?? {};
+  if (enc.enabled && enc.sessionOnly) {
+    const pass = await getSessionPassphrase(activeProfile);
+    settings = { ...settings, encryption: { ...enc, passphrase: pass ?? "" } };
+  }
   return { ...DEFAULT_CONFIG, ...settings, _profileId: activeProfile };
 }
 async function getFlag(key) { return Boolean((await browser.storage.local.get(key))[key]); }

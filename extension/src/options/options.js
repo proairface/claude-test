@@ -31,7 +31,11 @@ function readForm() {
     historyLookbackDays: Math.max(1, Number($("historyLookbackDays").value) || 90),
     filters: { excludeDomains: parseDomainList($("excludeDomains").value) },
     role: $("role").value,
-    encryption: { enabled: $("encEnabled").checked, passphrase: $("encPassphrase").value },
+    encryption: {
+      enabled: $("encEnabled").checked,
+      passphrase: $("encPassphrase").value,
+      sessionOnly: $("encSessionOnly").checked,
+    },
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -64,10 +68,7 @@ function fillForm(cfg = {}) {
   if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
   if (cfg.filters?.excludeDomains) $("excludeDomains").value = cfg.filters.excludeDomains.join("\n");
   if (cfg.role) $("role").value = cfg.role;
-  if (cfg.encryption) {
-    $("encEnabled").checked = Boolean(cfg.encryption.enabled);
-    if (cfg.encryption.passphrase) $("encPassphrase").value = cfg.encryption.passphrase;
-  }
+  // Encryption fields are populated by loadPassphraseField() (async, mode-aware).
   updateVisibility();
 }
 
@@ -110,11 +111,41 @@ async function persistState() {
   await browser.storage.local.set({ [CONFIG_KEY]: cfgState });
 }
 
+const sessionPassKey = (p) => `browsersync:passphrase:${p}`;
+async function getSessionPassphrase(p) {
+  try { return (await browser.storage.session?.get(sessionPassKey(p)))?.[sessionPassKey(p)]; }
+  catch { return undefined; }
+}
+async function setSessionPassphrase(p, value) {
+  try { await browser.storage.session?.set({ [sessionPassKey(p)]: value }); } catch { /* unsupported */ }
+}
+async function clearSessionPassphrase(p) {
+  try { await browser.storage.session?.remove(sessionPassKey(p)); } catch { /* unsupported */ }
+}
+
 async function saveConfig() {
   const settings = readForm();
+  const enc = settings.encryption ?? {};
+  if (enc.enabled && enc.sessionOnly) {
+    // Keep the passphrase in memory only; never persist it to disk.
+    await setSessionPassphrase(cfgState.activeProfile, enc.passphrase);
+    settings.encryption = { ...enc, passphrase: "" };
+  } else {
+    await clearSessionPassphrase(cfgState.activeProfile);
+  }
   cfgState.profiles[cfgState.activeProfile] = settings;
   await persistState();
   return { ...settings, _profileId: cfgState.activeProfile };
+}
+
+// Populate the passphrase field from disk or session per the chosen mode.
+async function loadPassphraseField(settings) {
+  const enc = settings.encryption ?? {};
+  $("encEnabled").checked = Boolean(enc.enabled);
+  $("encSessionOnly").checked = Boolean(enc.sessionOnly);
+  $("encPassphrase").value = enc.sessionOnly
+    ? (await getSessionPassphrase(cfgState.activeProfile)) ?? ""
+    : enc.passphrase ?? "";
 }
 
 // Ask for permission to talk to the configured endpoint, only when needed.
@@ -342,6 +373,7 @@ $("profileSelect").addEventListener("change", async () => {
   cfgState.activeProfile = $("profileSelect").value;
   await persistState();
   fillForm(cfgState.profiles[cfgState.activeProfile] ?? {});
+  await loadPassphraseField(cfgState.profiles[cfgState.activeProfile] ?? {});
   $("profileDelete").disabled = cfgState.activeProfile === "default";
   setStatus(`Switched to profile "${cfgState.activeProfile}".`);
   await refreshPanels();
@@ -356,6 +388,7 @@ $("profileNew").addEventListener("click", async () => {
   await persistState();
   renderProfiles();
   fillForm({});
+  await loadPassphraseField({});
   setStatus(`Created profile "${name}".`);
   await refreshPanels();
 });
@@ -369,6 +402,7 @@ $("profileDelete").addEventListener("click", async () => {
   await persistState();
   renderProfiles();
   fillForm(cfgState.profiles.default ?? {});
+  await loadPassphraseField(cfgState.profiles.default ?? {});
   setStatus(`Deleted profile "${id}".`);
   await refreshPanels();
 });
@@ -377,6 +411,7 @@ async function init() {
   await loadState();
   renderProfiles();
   fillForm(cfgState.profiles[cfgState.activeProfile] ?? {});
+  await loadPassphraseField(cfgState.profiles[cfgState.activeProfile] ?? {});
   await refreshPanels();
 }
 init().catch((err) => setStatus(`Load failed: ${err.message}`));

@@ -6,6 +6,9 @@ import { createRemoteServerAdapter } from "./remoteServerAdapter.js";
 import { createWebdavAdapter } from "./webdavAdapter.js";
 import { createBrowserStorageAdapter } from "./browserStorageAdapter.js";
 import { createEncryptedAdapter } from "./encryptedAdapter.js";
+import { assertEncryptionUnlocked } from "./encGuard.js";
+
+export { EncryptionLockedError } from "./encGuard.js";
 
 /**
  * @param {object} cfg saved options (see options page)
@@ -13,7 +16,8 @@ import { createEncryptedAdapter } from "./encryptedAdapter.js";
  */
 export function createTransport(cfg = {}) {
   const base = createBaseTransport(cfg);
-  if (cfg.encryption?.enabled && cfg.encryption.passphrase) {
+  if (cfg.encryption?.enabled) {
+    assertEncryptionUnlocked(cfg); // fail closed — never sync plaintext when locked
     return createEncryptedAdapter(base, cfg.encryption.passphrase);
   }
   return base;
