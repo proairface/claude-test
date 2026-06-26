@@ -150,6 +150,14 @@ Repo structure, module interfaces, manifests, docs. No logic.
 - ⬜ **Still open (optional):** large-history delta sync (`/changes?since=`) +
   tombstone GC; signed self-hosted `.xpi` + `update_url`.
 
+## Post-launch improvements ✅ (in progress)
+- **CI** (`.github/workflows/ci.yml`): tests + build + `web-ext lint` on push/PR.
+- **Status popup**: toolbar popup with last-sync status + error badge.
+- **Secrets hardening**: self-describing encryption envelope with a strengthened
+  KDF (PBKDF2 600k, params stored per-envelope); opt-in memory-only passphrase
+  (`storage.session`, never on disk); **fail-closed** when encryption is enabled
+  but locked (never syncs plaintext). Threat model in `docs/SECURITY.md`.
+
 ### M6 (optional) — Chromium past-dated history via the agent
 The Chromium `history.addUrl` API can't set a past timestamp, so synced visits
 are stamped at sync time there (documented limitation we deliberately accepted).
