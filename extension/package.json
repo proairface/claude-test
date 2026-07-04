@@ -14,13 +14,15 @@
     "package:chrome": "npm run build:chrome && web-ext build --source-dir dist/chrome --artifacts-dir web-ext-artifacts --filename browsersync-chrome-{version}.zip --overwrite-dest",
     "package:firefox": "npm run build:firefox && web-ext build --source-dir dist/firefox --artifacts-dir web-ext-artifacts --filename browsersync-firefox-{version}.zip --overwrite-dest",
     "package": "npm run package:chrome && npm run package:firefox",
-    "test": "node --test"
+    "test": "node --test",
+    "test:e2e": "npm run build:chrome && xvfb-run -a node --test e2e/sync.e2e.mjs"
   },
   "dependencies": {
     "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
     "esbuild": "^0.21.0",
+    "playwright-core": "^1.61.1",
     "pngjs": "^7.0.0",
     "web-ext": "^8.0.0"
   }

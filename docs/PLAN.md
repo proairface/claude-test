@@ -152,6 +152,11 @@ Repo structure, module interfaces, manifests, docs. No logic.
   dumb file stores; signed self-hosted `.xpi` + `update_url`.
 
 ## Post-launch improvements ✅ (in progress)
+- **Browser E2E test** (`extension/e2e/sync.e2e.mjs`, `npm run test:e2e`):
+  Playwright loads the REAL built extension in REAL Chromium and syncs bookmarks
+  both ways through the REAL agent — covering the collector/applier/engine
+  against actual Chrome APIs (what unit tests mock). Runs headed under xvfb;
+  auto-skips if no Chromium is present (kept out of the fast unit CI).
 - **CI** (`.github/workflows/ci.yml`): tests + build + `web-ext lint` on push/PR.
 - **Status popup**: toolbar popup with last-sync status + error badge.
 - **Secrets hardening**: self-describing encryption envelope with a strengthened
