@@ -10,6 +10,7 @@ import { mergeState } from "./merge.js";
 import { ConcurrencyError } from "../transport/adapter.js";
 import { STATE_SCHEMA_VERSION, assertStateWritable } from "../model/version.js";
 import { validateState, LargeChangeError } from "../model/validate.js";
+import { gcTombstones, DEFAULT_RETENTION_MS } from "../model/gc.js";
 
 function maxLamport(...maps) {
   let m = 0;
@@ -43,7 +44,7 @@ export async function runSyncCycle(deps) {
   const {
     transport, collect, apply, store, type = "bookmark", owns = () => true,
     maxRemovals = null, allowLargeChange = false, keep = () => true, mode = "sync",
-    dryRun = false,
+    dryRun = false, retentionMs = DEFAULT_RETENTION_MS,
   } = deps;
   // Role modes: "sync" = two-way; "receive" = pull/apply only, never upload;
   // "send" = upload local only, never apply remote.
@@ -63,9 +64,30 @@ export async function runSyncCycle(deps) {
   const liveLocalHashes = {};
   for (const it of items) liveLocalHashes[it.id] = stableStringify(it.payload);
 
+  // Did anything change locally since last cycle? (drives conditional pull)
+  let localChanged = false;
+  for (const it of items) {
+    const b = baseline[it.id];
+    if (!b || b.deleted || stableStringify(b.payload) !== liveLocalHashes[it.id]) localChanged = true;
+  }
+  if (doCollect) {
+    for (const [id, rec] of Object.entries(baseline)) {
+      if (!rec.deleted && liveLocalHashes[id] === undefined && owns(rec, deviceId) && keep(rec)) {
+        localChanged = true;
+      }
+    }
+  }
+  const lastEtag = (await store.getLastEtag?.()) ?? null;
+
   // 2..5 wrapped so an optimistic-concurrency conflict can re-pull and retry.
   for (let attempt = 0; ; attempt++) {
-    const pulled = await transport.pull();
+    // Conditional (delta) pull: when nothing changed locally, ask the server to
+    // skip the body if the file is unchanged. A 304 means there's nothing to do.
+    const conditional = !localChanged && lastEtag != null && !dryRun;
+    const pulled = await transport.pull(conditional ? { etag: lastEtag } : {});
+    if (pulled.notModified) {
+      return { applied: 0, total: Object.keys(baseline).length, skipped: true };
+    }
     // Corruption guard: refuse to act on state that isn't plausibly valid.
     validateState(pulled.state);
     // Cross-version safety: never overwrite state from a newer schema major.
@@ -129,12 +151,21 @@ export async function runSyncCycle(deps) {
 
     await apply(applyList);
 
-    if (doPush) {
+    // Tombstone GC: forget delete-markers older than the retention window.
+    const { records: gcMerged } = gcTombstones(merged, Date.now(), retentionMs);
+    const fileRecords = { ...otherTypes, ...gcMerged };
+    // Only upload when we actually changed the file — saves bandwidth (and, on
+    // the encrypted path, an expensive re-encrypt) on no-op cycles.
+    const changed = stableStringify(fileRecords) !== stableStringify(allRemote);
+
+    let newEtag = pulled.etag ?? null;
+    if (doPush && changed) {
       try {
-        await transport.push(
-          { version: STATE_SCHEMA_VERSION, records: { ...otherTypes, ...merged }, updatedAt: Date.now() },
+        const r = await transport.push(
+          { version: STATE_SCHEMA_VERSION, records: fileRecords, updatedAt: Date.now() },
           pulled.etag,
         );
+        newEtag = r?.etag ?? null;
       } catch (err) {
         if (err instanceof ConcurrencyError && attempt < 3) continue; // re-pull, retry
         throw err;
@@ -142,7 +173,8 @@ export async function runSyncCycle(deps) {
     }
 
     await store.setLamport(tick);
-    await store.setBaseline(merged); // baseline holds only this type's records
-    return { applied: applyList.length, total: Object.keys(merged).length };
+    await store.setBaseline(gcMerged); // baseline holds only this type's records
+    await store.setLastEtag?.(newEtag);
+    return { applied: applyList.length, total: Object.keys(gcMerged).length };
   }
 }

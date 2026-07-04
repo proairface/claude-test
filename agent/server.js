@@ -92,6 +92,11 @@ export function createAgentServer({ syncFile, token }) {
 
       if (route === "GET /state") {
         const { state, etag } = await readState(syncFile);
+        // Conditional (delta) transfer: skip the body if the client is current.
+        if (req.headers["if-none-match"] === etag) {
+          res.writeHead(304, { ETag: etag });
+          return res.end();
+        }
         return sendJson(res, 200, state, { ETag: etag });
       }
 

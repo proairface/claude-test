@@ -12,8 +12,10 @@ export function createMemoryAdapter(initial = { version: 1, records: {}, updated
   let version = 0;
 
   return {
-    async pull() {
-      return { state: structuredClone(state), etag: String(version) };
+    async pull(opts = {}) {
+      const etag = String(version);
+      if (opts.etag !== undefined && opts.etag === etag) return { notModified: true, etag };
+      return { state: structuredClone(state), etag };
     },
     async push(next, etag) {
       if (etag !== undefined && etag !== String(version)) {
@@ -28,6 +30,9 @@ export function createMemoryAdapter(initial = { version: 1, records: {}, updated
     },
     snapshot() {
       return structuredClone(state);
+    },
+    getVersion() {
+      return version; // bumps only on push — lets tests assert a push was skipped
     },
   };
 }

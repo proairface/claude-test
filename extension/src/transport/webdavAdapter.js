@@ -40,8 +40,11 @@ export function createWebdavAdapter({ url, username, password } = {}) {
   const auth = basicAuth(username, password);
 
   return {
-    async pull() {
-      const res = await fetch(url, { headers: { ...auth } });
+    async pull(opts = {}) {
+      const headers = { ...auth };
+      if (opts.etag) headers["If-None-Match"] = opts.etag;
+      const res = await fetch(url, { headers });
+      if (res.status === 304) return { notModified: true, etag: opts.etag };
       if (res.status === 404) return { state: structuredClone(EMPTY_STATE), etag: undefined };
       if (res.status === 401) throw new Error("WebDAV auth failed (401)");
       if (!res.ok) throw new Error(`WebDAV pull failed: ${res.status}`);

@@ -40,12 +40,15 @@ export function makeDevice(transport, deviceId) {
 
   let lamport = 0;
   let baseline = {};
+  let etag = null;
   const store = {
     getDeviceId: async () => deviceId,
     getLamport: async () => lamport,
     setLamport: async (n) => { lamport = n; },
     getBaseline: async () => baseline,
     setBaseline: async (m) => { baseline = m; },
+    getLastEtag: async () => etag,
+    setLastEtag: async (e) => { etag = e; },
   };
 
   return {
