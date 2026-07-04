@@ -6,7 +6,7 @@
 // vs personal, different files) never cross-contaminate. The "default" profile
 // uses the original un-prefixed keys for backward compatibility.
 import browser from "../lib/browser.js";
-import { keyLamport, keyBaseline, keyWatermark } from "./storeKeys.js";
+import { keyLamport, keyBaseline, keyWatermark, keyEtag } from "./storeKeys.js";
 
 const KEY_DEVICE = "browsersync:deviceId";
 
@@ -39,5 +39,8 @@ export function createStore(type, profileId = "default") {
     setBaseline: (map) => set(keyBaseline(type, profileId), map),
     getWatermark: () => get(keyWatermark(type, profileId), null),
     setWatermark: (ms) => set(keyWatermark(type, profileId), ms),
+    // Last-seen file ETag (per profile) for conditional (delta) transfers.
+    getLastEtag: () => get(keyEtag(profileId), null),
+    setLastEtag: (etag) => set(keyEtag(profileId), etag),
   };
 }

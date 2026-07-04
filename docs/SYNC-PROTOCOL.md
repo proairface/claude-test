@@ -81,8 +81,15 @@ GET  /health           -> 200 { ok: true, version }
 
 - `If-Match: <etag>` on `PUT` gives optimistic concurrency; on 412 the client
   re-pulls, re-merges, retries.
-- v2 may add `GET /changes?since=<lamport>` for delta sync; v1 ships
-  whole-blob for simplicity and correctness.
+- **Conditional (delta) transfer:** `GET /state` honors `If-None-Match: <etag>`
+  and returns `304 Not Modified` (no body) when the file is unchanged. The
+  client caches the last-seen ETag per profile and, when nothing changed
+  locally, uses this to skip re-downloading; it also skips the `PUT` entirely
+  when the merged file is byte-identical to what it pulled. This works on every
+  transport (agent, WebDAV) without a protocol change — the whole-blob model is
+  kept for simplicity/correctness, and the redundant transfers are elided.
+- A record-level `GET /changes?since=<lamport>` remains possible future work for
+  very large stores on dumb file backends (append-log layout).
 
 ## Encryption (M6, optional)
 

@@ -32,8 +32,11 @@ export function createLocalAgentAdapter({ baseUrl = "http://127.0.0.1:8787", tok
       }
     },
 
-    async pull() {
-      const res = await fetch(`${base}/state`, { headers: authHeaders });
+    async pull(opts = {}) {
+      const headers = { ...authHeaders };
+      if (opts.etag) headers["If-None-Match"] = opts.etag;
+      const res = await fetch(`${base}/state`, { headers });
+      if (res.status === 304) return { notModified: true, etag: opts.etag };
       if (!res.ok) throw new Error(`agent pull failed: ${res.status}`);
       const state = await res.json();
       return { state, etag: res.headers.get("etag") ?? undefined };

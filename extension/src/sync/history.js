@@ -5,7 +5,7 @@
 // tombstones. It is incremental (a watermark cursor) and loop-safe (it skips
 // visits whose id is already in the shared state, so re-importing what we just
 // applied can't run away — see docs for the Chromium-timestamp caveat).
-import { makeRecord } from "../model/records.js";
+import { makeRecord, stableStringify } from "../model/records.js";
 import { pickWinner } from "./merge.js";
 import { ConcurrencyError } from "../transport/adapter.js";
 import { STATE_SCHEMA_VERSION, assertStateWritable } from "../model/version.js";
@@ -44,9 +44,17 @@ export async function runHistorySync(deps) {
   const knownIds = new Set(Object.keys(baseline));
   const cycleStart = Date.now();
   const newItems = doCollect ? await collect(watermark, knownIds, deviceId) : [];
+  const localChanged = newItems.length > 0;
+  const lastEtag = (await store.getLastEtag?.()) ?? null;
 
   for (let attempt = 0; ; attempt++) {
-    const pulled = await transport.pull();
+    // Conditional (delta) pull — skip the body when nothing changed either side.
+    const conditional = !localChanged && lastEtag != null && !dryRun;
+    const pulled = await transport.pull(conditional ? { etag: lastEtag } : {});
+    if (pulled.notModified) {
+      await store.setWatermark(cycleStart);
+      return { applied: 0, total: Object.keys(baseline).length, skipped: true };
+    }
     validateState(pulled.state);
     assertStateWritable(pulled.state);
     const all = pulled.state?.records ?? {};
@@ -86,12 +94,16 @@ export async function runHistorySync(deps) {
 
     await apply(doApply ? toApply : []);
 
-    if (doPush) {
+    const fileRecords = { ...other, ...merged };
+    const changed = stableStringify(fileRecords) !== stableStringify(all);
+    let newEtag = pulled.etag ?? null;
+    if (doPush && changed) {
       try {
-        await transport.push(
-          { version: STATE_SCHEMA_VERSION, records: { ...other, ...merged }, updatedAt: Date.now() },
+        const r = await transport.push(
+          { version: STATE_SCHEMA_VERSION, records: fileRecords, updatedAt: Date.now() },
           pulled.etag,
         );
+        newEtag = r?.etag ?? null;
       } catch (err) {
         if (err instanceof ConcurrencyError && attempt < 3) continue;
         throw err;
@@ -101,6 +113,7 @@ export async function runHistorySync(deps) {
     await store.setLamport(tick);
     await store.setBaseline(merged);
     await store.setWatermark(cycleStart); // next cycle collects visits from here on
+    await store.setLastEtag?.(newEtag);
     return { applied: doApply ? toApply.length : 0, total: Object.keys(merged).length };
   }
 }

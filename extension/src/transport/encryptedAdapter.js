@@ -10,10 +10,11 @@ import { encryptJSON, decryptJSON, isEnvelope } from "./crypto.js";
  */
 export function createEncryptedAdapter(inner, passphrase) {
   const wrapped = {
-    async pull() {
-      const { state, etag } = await inner.pull();
-      if (isEnvelope(state)) return { state: await decryptJSON(state, passphrase), etag };
-      return { state, etag }; // plaintext (new/un-migrated) — passes through
+    async pull(opts) {
+      const r = await inner.pull(opts);
+      if (r.notModified) return r; // no download, no decrypt
+      if (isEnvelope(r.state)) return { state: await decryptJSON(r.state, passphrase), etag: r.etag };
+      return r; // plaintext (new/un-migrated) — passes through
     },
     async push(state, etag) {
       return inner.push(await encryptJSON(state, passphrase), etag);

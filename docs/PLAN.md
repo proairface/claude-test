@@ -147,8 +147,9 @@ Repo structure, module interfaces, manifests, docs. No logic.
   `docs/PUBLISHING.md`, `STORE.md` (listing + permission justifications),
   `PRIVACY.md`, and agent service installers (`agent/install/` systemd +
   launchd).
-- ⬜ **Still open (optional):** large-history delta sync (`/changes?since=`) +
-  tombstone GC; signed self-hosted `.xpi` + `update_url`.
+- ✅ **Delta sync (conditional transfer) + tombstone GC** — see Post-launch.
+- ⬜ **Still open (optional):** record-level delta over an append-log layout for
+  dumb file stores; signed self-hosted `.xpi` + `update_url`.
 
 ## Post-launch improvements ✅ (in progress)
 - **CI** (`.github/workflows/ci.yml`): tests + build + `web-ext lint` on push/PR.
@@ -157,6 +158,13 @@ Repo structure, module interfaces, manifests, docs. No logic.
   KDF (PBKDF2 600k, params stored per-envelope); opt-in memory-only passphrase
   (`storage.session`, never on disk); **fail-closed** when encryption is enabled
   but locked (never syncs plaintext). Threat model in `docs/SECURITY.md`.
+- **Delta sync (conditional transfer)**: `If-None-Match`/`304` conditional pull
+  (agent + WebDAV + memory) so unchanged remotes aren't re-downloaded; skip the
+  push (and the expensive re-encrypt) when the file didn't change; a per-profile
+  ETag cache drives it. Works on every transport (no protocol break). Plus
+  **tombstone GC** (`model/gc.js`, 90-day retention) so the blob doesn't grow
+  forever. The dominant cost — frequent scheduled syncs re-shipping MBs when
+  nothing changed — is now ~one conditional GET.
 
 ### M6 (optional) — Chromium past-dated history via the agent
 The Chromium `history.addUrl` API can't set a past timestamp, so synced visits
