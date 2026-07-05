@@ -10,8 +10,9 @@ From `extension/`:
 ```bash
 npm install
 npm run icons        # (re)generate icon PNGs — replace with final artwork first
-npm test             # 71 tests
+npm test             # unit tests
 npm run lint:firefox # web-ext lint — must be 0 errors
+npm run test:e2e     # optional: real-browser E2E (Linux + Chromium + xvfb)
 npm run package      # -> web-ext-artifacts/browsersync-chrome-<v>.zip and -firefox-<v>.zip
 ```
 
