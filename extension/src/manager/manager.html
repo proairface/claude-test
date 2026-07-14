@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BrowserSync — Bookmark manager</title>
+    <style>
+      body { font: 14px/1.6 system-ui, sans-serif; max-width: 54rem; margin: 2rem auto; padding: 0 1rem; }
+      h1 { font-size: 20px; }
+      .note { background: #eef6ff; border: 1px solid #9cc3ee; padding: .6rem .8rem; border-radius: 4px; color: #333; }
+      #search { width: 100%; box-sizing: border-box; padding: .5rem; margin: 1rem 0; }
+      ul { list-style: none; padding-left: 1.1rem; margin: .1rem 0; }
+      li { margin: .05rem 0; padding: .05rem .2rem; border-radius: 3px; }
+      li:hover { background: #f5f7fa; }
+      li.folder > .label { cursor: pointer; font-weight: 600; }
+      li.folder > .label::before { content: "▸ "; color: #888; }
+      li.folder.open > .label::before { content: "▾ "; }
+      li.folder:not(.open) > ul { display: none; }
+      a.label { color: #1a56c4; text-decoration: none; }
+      a.label:hover { text-decoration: underline; }
+      .u { color: #999; font-size: 12px; margin-left: .4rem; }
+      .rename { font: inherit; padding: .1rem .3rem; }
+      .acts { margin-left: .5rem; opacity: 0; }
+      li:hover > .acts { opacity: 1; }
+      .act { border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 0 .15rem; }
+      .act:hover { background: #e3e8ef; border-radius: 3px; }
+      li[draggable="true"] { cursor: grab; }
+    </style>
+  </head>
+  <body>
+    <h1>Bookmark manager</h1>
+    <p class="note">Browse and edit your bookmarks: <strong>rename</strong> (✎), <strong>delete</strong> (🗑),
+      add a <strong>folder</strong> (📁+) or <strong>bookmark</strong> (🔖+), and <strong>drag</strong> to move or
+      reorder. Top-level folders (Bookmarks Bar, etc.) can't be renamed or deleted. Every change syncs to your other
+      devices automatically.</p>
+    <input id="search" type="search" placeholder="filter by title or URL…" autocomplete="off" />
+    <div id="tree"></div>
+    <script type="module" src="manager.js"></script>
+  </body>
+</html>

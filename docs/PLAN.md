@@ -152,6 +152,16 @@ Repo structure, module interfaces, manifests, docs. No logic.
   dumb file stores; signed self-hosted `.xpi` + `update_url`.
 
 ## Post-launch improvements ✅ (in progress)
+- **Bookmark management UI.** Tier 1 (done): the toolbar popup can bookmark /
+  rename / remove the current page and search-and-open bookmarks (changes
+  auto-sync via existing listeners). Tier 2 (done): a full-page manager
+  (`manager/`) — filterable folder tree with inline rename, delete
+  (`removeTree` for folders), new folder / new bookmark, and drag-and-drop
+  move/reorder; top-level special folders are protected. Rename/new-folder/
+  delete verified via the real UI in Chromium (DnD uses standard HTML5 events).
+  Reorder is **engine-agnostic**: it never does a same-parent forward move (the
+  operation Chrome/Firefox index differently) — it appends to the destination
+  then does a backward move, both consistent across browsers (verified).
 - **Browser E2E test** (`extension/e2e/sync.e2e.mjs`, `npm run test:e2e`):
   Playwright loads the REAL built extension in REAL Chromium and syncs bookmarks
   both ways through the REAL agent — covering the collector/applier/engine
