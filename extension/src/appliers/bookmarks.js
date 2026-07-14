@@ -22,8 +22,22 @@ async function ensureFolderPath(roleFolders, parentPath) {
   return folderId;
 }
 
+// Move an existing node to `index` within its folder. Engine-agnostic: append
+// then a backward move (Chrome/Firefox disagree only on same-parent FORWARD
+// moves, which this avoids).
+async function positionAt(id, parentId, index) {
+  if (typeof index !== "number") return;
+  const kids = await browser.bookmarks.getChildren(parentId);
+  if (kids.findIndex((k) => k.id === id) === index) return; // already there
+  await browser.bookmarks.move(id, { parentId }); // append to end
+  const after = await browser.bookmarks.getChildren(parentId);
+  const target = Math.min(Math.max(0, index), after.length - 1);
+  if (target !== after.length - 1) await browser.bookmarks.move(id, { parentId, index: target });
+}
+
 /**
- * Apply a batch of bookmark records.
+ * Apply a batch of bookmark records, preserving each bookmark's position within
+ * its folder so ordering is consistent across devices.
  * @param {import("../model/records.js").Record[]} records
  * @param {{add?:boolean, update?:boolean, remove?:boolean}} [perms]
  */
@@ -32,8 +46,16 @@ export async function applyBookmarks(records, perms = {}) {
   const tree = await browser.bookmarks.getTree();
   const roleFolders = roleFolderIdsFromTree(tree);
 
-  for (const rec of records) {
-    const { url, title, parentPath } = rec.payload;
+  // Apply per folder in ascending index order so inserts build up in order.
+  const ordered = [...records].sort((a, b) => {
+    const pa = (a.payload.parentPath ?? []).join("/");
+    const pb = (b.payload.parentPath ?? []).join("/");
+    if (pa !== pb) return pa < pb ? -1 : 1;
+    return (a.payload.index ?? 0) - (b.payload.index ?? 0);
+  });
+
+  for (const rec of ordered) {
+    const { url, title, parentPath, index } = rec.payload;
     const folderId = await ensureFolderPath(roleFolders, parentPath);
     const siblings = await browser.bookmarks.getChildren(folderId);
     const match = siblings.find((c) => c.url === url);
@@ -43,10 +65,15 @@ export async function applyBookmarks(records, perms = {}) {
         await browser.bookmarks.remove(match.id);
         break;
       case "create":
-        await browser.bookmarks.create({ parentId: folderId, url, title });
+        // create()'s index is unambiguous (a fresh insert), consistent on both engines.
+        await browser.bookmarks.create({
+          parentId: folderId, url, title,
+          ...(typeof index === "number" ? { index } : {}),
+        });
         break;
       case "update":
-        await browser.bookmarks.update(match.id, { title });
+        if (match.title !== (title ?? "")) await browser.bookmarks.update(match.id, { title });
+        await positionAt(match.id, folderId, index);
         break;
       default: // skip / noop
         break;
