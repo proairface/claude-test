@@ -26,3 +26,39 @@ jobs:
         run: npm run build
       - name: Lint (web-ext, Firefox)
         run: npm run lint:firefox
+
+  # Real-Firefox load smoke: launch the built extension headlessly and confirm
+  # it loads without a startup error (catches Firefox-specific manifest/API
+  # breakage that static lint can't). Not behavioral — Playwright can't drive
+  # Firefox extensions. Separate job so it never blocks the fast unit checks.
+  firefox-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - uses: browser-actions/setup-firefox@v1
+      - run: npm ci
+      - run: npm run build:firefox
+      - name: Load extension in headless Firefox
+        env:
+          MOZ_HEADLESS: "1"
+        run: |
+          set +e
+          timeout 45s npx web-ext run --source-dir dist/firefox --no-input --verbose
+          code=$?
+          # timeout(1) returns 124 when it kills a still-running process — i.e.
+          # web-ext started Firefox and the extension stayed loaded. Any other
+          # exit means web-ext failed to launch/load the extension.
+          if [ "$code" -eq 124 ]; then
+            echo "✓ Extension loaded in Firefox and ran until timeout."
+            exit 0
+          fi
+          echo "✗ web-ext exited early with code $code (extension failed to load)."
+          exit 1

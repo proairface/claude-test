@@ -14,6 +14,25 @@ export class CorruptStateError extends Error {
   }
 }
 
+/**
+ * Raised when the pulled state's sequence number is OLDER than one we've already
+ * seen — a possible rollback/replay by an untrusted transport. (AES-GCM proves a
+ * blob wasn't modified, not that it's the latest, so a hostile server could
+ * serve a stale-but-valid blob; this catches that.)
+ */
+export class RollbackError extends Error {
+  constructor(found, expected) {
+    super(
+      `Sync data went backwards (seq ${found} < last seen ${expected}) — possible rollback by ` +
+        `the transport. Refusing to apply. If you intentionally reset the sync file, clear the ` +
+        `rollback guard in Settings.`,
+    );
+    this.name = "RollbackError";
+    this.found = found;
+    this.expected = expected;
+  }
+}
+
 /** Raised when a single sync would remove more items than the user allows. */
 export class LargeChangeError extends Error {
   constructor(count, limit, recordType) {

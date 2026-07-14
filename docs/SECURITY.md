@@ -20,8 +20,15 @@ extension** (AES-GCM; key derived from your passphrase via PBKDF2). So:
   about the *transport*, not your own device.
 - **A malicious transport replaying an OLD ciphertext (rollback).** AES-GCM
   proves a blob wasn't *modified*, not that it's the *latest*. A hostile server
-  could serve a stale (but validly-encrypted) blob. This is an accepted
-  limitation; mitigation (a signed monotonic counter) is future work.
+  could serve a stale (but validly-encrypted) blob. **Opt-in rollback protection**
+  (Settings → "Detect rollback") mitigates this: the sync state carries a
+  monotonically increasing `seq` (bumped on every accepted push, and — under
+  encryption — authenticated inside the envelope), and a device refuses a pull
+  whose `seq` regressed below the highest it has seen (`RollbackError`). An empty
+  state is exempt so a deliberate reset isn't mistaken for an attack; after
+  intentionally wiping the sync file, click "Reset rollback guard". Meaningful
+  mainly with encryption (on a plaintext transport an attacker can already forge
+  `seq`).
 
 ## How secrets are handled
 - **Passphrase storage — your choice:**

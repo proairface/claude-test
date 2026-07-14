@@ -152,6 +152,15 @@ Repo structure, module interfaces, manifests, docs. No logic.
   dumb file stores; signed self-hosted `.xpi` + `update_url`.
 
 ## Post-launch improvements ✅ (in progress)
+- **Rollback protection (opt-in).** The sync state carries a monotonic `seq`;
+  with "Detect rollback" on, a device refuses a pull whose `seq` regressed below
+  the highest it has seen (`RollbackError`), catching an untrusted transport
+  replaying an old blob. Empty state exempt (legitimate reset) + a "Reset
+  rollback guard" action. Engine + history + store + options; 4 tests.
+- **Firefox load smoke in CI.** A separate `firefox-smoke` job installs real
+  Firefox and loads the built extension headlessly via `web-ext run` (timeout →
+  loaded-OK), catching Firefox-specific load breakage that lint can't. Not
+  behavioral (Playwright can't drive Firefox extensions).
 - **Bookmark ordering fidelity.** The applier now preserves each bookmark's
   position within its folder across devices: `create` honors `payload.index`,
   an index change counts as an update (`plannedAction`), and repositioning uses

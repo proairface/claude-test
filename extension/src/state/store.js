@@ -6,7 +6,7 @@
 // vs personal, different files) never cross-contaminate. The "default" profile
 // uses the original un-prefixed keys for backward compatibility.
 import browser from "../lib/browser.js";
-import { keyLamport, keyBaseline, keyWatermark, keyEtag } from "./storeKeys.js";
+import { keyLamport, keyBaseline, keyWatermark, keyEtag, keyRollbackSeq } from "./storeKeys.js";
 
 const KEY_DEVICE = "browsersync:deviceId";
 
@@ -42,5 +42,8 @@ export function createStore(type, profileId = "default") {
     // Last-seen file ETag (per profile) for conditional (delta) transfers.
     getLastEtag: () => get(keyEtag(profileId), null),
     setLastEtag: (etag) => set(keyEtag(profileId), etag),
+    // Highest sequence number seen (per profile) for rollback detection.
+    getRollbackSeq: () => get(keyRollbackSeq(profileId), 0),
+    setRollbackSeq: (n) => set(keyRollbackSeq(profileId), n),
   };
 }
