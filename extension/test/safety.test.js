@@ -34,7 +34,15 @@ test("plannedAction honors add/update/remove permissions", () => {
   assert.equal(plannedAction(rec({}, true), { title: "Old" }, all), "remove");
   assert.equal(plannedAction(rec({}, true), { title: "Old" }, none), "skip");
   // no-op when identical
-  assert.equal(plannedAction(rec({ title: "Same" }), { title: "Same" }, all), "noop");
+  assert.equal(plannedAction(rec({ title: "Same", index: 2 }), { title: "Same", index: 2 }, all), "noop");
+});
+
+test("plannedAction treats a position (index) change as an update", () => {
+  const all = { add: true, update: true, remove: true };
+  const rec = { deleted: false, payload: { title: "T", index: 0 } };
+  assert.equal(plannedAction(rec, { title: "T", index: 5 }, all), "update"); // moved
+  assert.equal(plannedAction(rec, { title: "T", index: 0 }, all), "noop");   // same spot
+  assert.equal(plannedAction(rec, { title: "T", index: 5 }, { update: false }), "skip");
 });
 
 // --- backup retention -------------------------------------------------------

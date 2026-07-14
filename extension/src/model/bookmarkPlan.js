@@ -11,6 +11,10 @@
 export function plannedAction(rec, match, perms = {}) {
   if (rec.deleted) return match ? (perms.remove !== false ? "remove" : "skip") : "noop";
   if (!match) return perms.add !== false ? "create" : "skip";
-  if (match.title !== (rec.payload?.title ?? "")) return perms.update !== false ? "update" : "skip";
+  const titleDiff = match.title !== (rec.payload?.title ?? "");
+  // A position change is also an update, so folder ordering syncs across devices.
+  const wantIndex = rec.payload?.index;
+  const indexDiff = typeof wantIndex === "number" && match.index !== wantIndex;
+  if (titleDiff || indexDiff) return perms.update !== false ? "update" : "skip";
   return "noop";
 }

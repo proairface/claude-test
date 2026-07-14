@@ -152,6 +152,11 @@ Repo structure, module interfaces, manifests, docs. No logic.
   dumb file stores; signed self-hosted `.xpi` + `update_url`.
 
 ## Post-launch improvements ✅ (in progress)
+- **Bookmark ordering fidelity.** The applier now preserves each bookmark's
+  position within its folder across devices: `create` honors `payload.index`,
+  an index change counts as an update (`plannedAction`), and repositioning uses
+  the engine-agnostic append+backward move. Verified in real Chromium (initial
+  order preserved; a reorder propagates).
 - **Bookmark management UI.** Tier 1 (done): the toolbar popup can bookmark /
   rename / remove the current page and search-and-open bookmarks (changes
   auto-sync via existing listeners). Tier 2 (done): a full-page manager
