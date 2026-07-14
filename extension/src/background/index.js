@@ -92,6 +92,7 @@ async function syncBookmarks(cfg, { dryRun = false } = {}) {
       maxRemovals,
       allowLargeChange,
       mode: cfg.role ?? "sync",
+      rollbackGuard: cfg.rollbackGuard === true,
     });
     await browser.storage.local.remove(PENDING_KEY);
     return res;
@@ -118,6 +119,7 @@ async function syncTabs(cfg, deviceId, { dryRun = false } = {}) {
     keep: keepFor(cfg),
     mode: cfg.role ?? "sync",
     dryRun,
+    rollbackGuard: cfg.rollbackGuard === true,
   });
   if (!dryRun) await cacheRemoteTabs(store, deviceId);
   return result;
@@ -151,6 +153,7 @@ async function syncHistory(cfg, deviceId, { dryRun = false } = {}) {
     mode: cfg.role ?? "sync",
     dryRun,
     initialWatermark: Date.now() - lookbackDays * 86400000,
+    rollbackGuard: cfg.rollbackGuard === true,
   });
 }
 
@@ -322,6 +325,8 @@ browser.runtime.onMessage.addListener((msg) => {
       return exportSnapshot();
     case "IMPORT_DATA":
       return importSnapshot(msg.text);
+    case "RESET_ROLLBACK": // user intentionally reset the sync file
+      return getConfig().then((cfg) => createStore("bookmark", cfg._profileId).setRollbackSeq(0));
     default:
       return undefined;
   }

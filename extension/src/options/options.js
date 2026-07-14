@@ -36,6 +36,7 @@ function readForm() {
       passphrase: $("encPassphrase").value,
       sessionOnly: $("encSessionOnly").checked,
     },
+    rollbackGuard: $("rollbackGuard").checked,
   };
   for (const f of TEXT_FIELDS) cfg[f] = $(f).value.trim?.() ?? $(f).value;
   return cfg;
@@ -68,6 +69,7 @@ function fillForm(cfg = {}) {
   if (cfg.historyLookbackDays != null) $("historyLookbackDays").value = cfg.historyLookbackDays;
   if (cfg.filters?.excludeDomains) $("excludeDomains").value = cfg.filters.excludeDomains.join("\n");
   if (cfg.role) $("role").value = cfg.role;
+  $("rollbackGuard").checked = Boolean(cfg.rollbackGuard);
   // Encryption fields are populated by loadPassphraseField() (async, mode-aware).
   updateVisibility();
 }
@@ -244,6 +246,12 @@ async function refreshPanels() {
 document.addEventListener("change", () => {
   updateVisibility();
   saveConfig().catch((err) => setStatus(`Save failed: ${err.message}`));
+});
+
+$("resetRollback").addEventListener("click", async () => {
+  await saveConfig();
+  await browser.runtime.sendMessage({ type: "RESET_ROLLBACK" });
+  setStatus("Rollback guard reset — next sync accepts the current sync file as the baseline.");
 });
 
 $("syncNow").addEventListener("click", async () => {

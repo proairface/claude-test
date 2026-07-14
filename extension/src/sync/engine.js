@@ -9,7 +9,7 @@ import { makeRecord, stableStringify } from "../model/records.js";
 import { mergeState } from "./merge.js";
 import { ConcurrencyError } from "../transport/adapter.js";
 import { STATE_SCHEMA_VERSION, assertStateWritable } from "../model/version.js";
-import { validateState, LargeChangeError } from "../model/validate.js";
+import { validateState, LargeChangeError, RollbackError } from "../model/validate.js";
 import { gcTombstones, DEFAULT_RETENTION_MS } from "../model/gc.js";
 
 function maxLamport(...maps) {
@@ -44,7 +44,7 @@ export async function runSyncCycle(deps) {
   const {
     transport, collect, apply, store, type = "bookmark", owns = () => true,
     maxRemovals = null, allowLargeChange = false, keep = () => true, mode = "sync",
-    dryRun = false, retentionMs = DEFAULT_RETENTION_MS,
+    dryRun = false, retentionMs = DEFAULT_RETENTION_MS, rollbackGuard = false,
   } = deps;
   // Role modes: "sync" = two-way; "receive" = pull/apply only, never upload;
   // "send" = upload local only, never apply remote.
@@ -93,6 +93,12 @@ export async function runSyncCycle(deps) {
     // Cross-version safety: never overwrite state from a newer schema major.
     assertStateWritable(pulled.state);
     const allRemote = pulled.state?.records ?? {};
+
+    // Rollback guard: refuse a state whose seq went backwards (possible replay).
+    const seq = Number(pulled.state?.seq ?? 0);
+    const emptyState = Object.keys(allRemote).length === 0;
+    const maxSeen = rollbackGuard ? await (store.getRollbackSeq?.() ?? 0) : 0;
+    if (rollbackGuard && !emptyState && seq < maxSeen) throw new RollbackError(seq, maxSeen);
 
     // Split the shared state into our type (to merge) and everything else
     // (to preserve verbatim on push).
@@ -158,14 +164,17 @@ export async function runSyncCycle(deps) {
     // the encrypted path, an expensive re-encrypt) on no-op cycles.
     const changed = stableStringify(fileRecords) !== stableStringify(allRemote);
 
+    const nextSeq = seq + 1;
     let newEtag = pulled.etag ?? null;
+    let pushed = false;
     if (doPush && changed) {
       try {
         const r = await transport.push(
-          { version: STATE_SCHEMA_VERSION, records: fileRecords, updatedAt: Date.now() },
+          { version: STATE_SCHEMA_VERSION, records: fileRecords, updatedAt: Date.now(), seq: nextSeq },
           pulled.etag,
         );
         newEtag = r?.etag ?? null;
+        pushed = true;
       } catch (err) {
         if (err instanceof ConcurrencyError && attempt < 3) continue; // re-pull, retry
         throw err;
@@ -175,6 +184,10 @@ export async function runSyncCycle(deps) {
     await store.setLamport(tick);
     await store.setBaseline(gcMerged); // baseline holds only this type's records
     await store.setLastEtag?.(newEtag);
+    if (rollbackGuard) {
+      const finalSeq = pushed ? nextSeq : seq;
+      await store.setRollbackSeq?.(emptyState ? finalSeq : Math.max(maxSeen, finalSeq));
+    }
     return { applied: applyList.length, total: Object.keys(gcMerged).length };
   }
 }

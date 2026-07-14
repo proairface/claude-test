@@ -95,6 +95,10 @@
       <p class="hint">The transport (WebDAV/cloud/agent) only ever sees ciphertext. Enter the SAME passphrase on
         every device. ⚠️ If you lose it, the data is unrecoverable — keep an unencrypted export somewhere safe.
         Memory-only is more secure but pauses background sync until you re-enter it each browser session.</p>
+      <label><input type="checkbox" id="rollbackGuard" /> Detect rollback (refuse sync data that goes backwards)</label>
+      <button id="resetRollback" type="button">Reset rollback guard</button>
+      <p class="hint">Guards against an untrusted transport replaying an old copy of your data. Recommended with
+        encryption. If you intentionally reset/wipe your sync file, click "Reset rollback guard" once.</p>
     </fieldset>
 
     <fieldset>

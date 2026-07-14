@@ -9,7 +9,7 @@ import { makeRecord, stableStringify } from "../model/records.js";
 import { pickWinner } from "./merge.js";
 import { ConcurrencyError } from "../transport/adapter.js";
 import { STATE_SCHEMA_VERSION, assertStateWritable } from "../model/version.js";
-import { validateState } from "../model/validate.js";
+import { validateState, RollbackError } from "../model/validate.js";
 
 function maxLamport(...maps) {
   let m = 0;
@@ -28,7 +28,7 @@ function maxLamport(...maps) {
  * @returns {Promise<{applied:number,total:number}>}
  */
 export async function runHistorySync(deps) {
-  const { transport, collect, apply, store, type = "visit", keep = () => true, mode = "sync", dryRun = false } = deps;
+  const { transport, collect, apply, store, type = "visit", keep = () => true, mode = "sync", dryRun = false, rollbackGuard = false } = deps;
   const doCollect = mode !== "receive";
   const doApply = mode !== "send";
   const doPush = mode !== "receive";
@@ -58,6 +58,11 @@ export async function runHistorySync(deps) {
     validateState(pulled.state);
     assertStateWritable(pulled.state);
     const all = pulled.state?.records ?? {};
+
+    const seq = Number(pulled.state?.seq ?? 0);
+    const emptyState = Object.keys(all).length === 0;
+    const maxSeen = rollbackGuard ? await (store.getRollbackSeq?.() ?? 0) : 0;
+    if (rollbackGuard && !emptyState && seq < maxSeen) throw new RollbackError(seq, maxSeen);
 
     const remote = {};
     const other = {};
@@ -96,14 +101,17 @@ export async function runHistorySync(deps) {
 
     const fileRecords = { ...other, ...merged };
     const changed = stableStringify(fileRecords) !== stableStringify(all);
+    const nextSeq = seq + 1;
     let newEtag = pulled.etag ?? null;
+    let pushed = false;
     if (doPush && changed) {
       try {
         const r = await transport.push(
-          { version: STATE_SCHEMA_VERSION, records: fileRecords, updatedAt: Date.now() },
+          { version: STATE_SCHEMA_VERSION, records: fileRecords, updatedAt: Date.now(), seq: nextSeq },
           pulled.etag,
         );
         newEtag = r?.etag ?? null;
+        pushed = true;
       } catch (err) {
         if (err instanceof ConcurrencyError && attempt < 3) continue;
         throw err;
@@ -114,6 +122,10 @@ export async function runHistorySync(deps) {
     await store.setBaseline(merged);
     await store.setWatermark(cycleStart); // next cycle collects visits from here on
     await store.setLastEtag?.(newEtag);
+    if (rollbackGuard) {
+      const finalSeq = pushed ? nextSeq : seq;
+      await store.setRollbackSeq?.(emptyState ? finalSeq : Math.max(maxSeen, finalSeq));
+    }
     return { applied: doApply ? toApply.length : 0, total: Object.keys(merged).length };
   }
 }
