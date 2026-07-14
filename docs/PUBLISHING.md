@@ -45,8 +45,18 @@ gecko.update_url`. Not needed if you list on AMO.
 ## GitHub Releases (hosting the zips)
 
 Build artifacts are **not** committed (`*.zip` and `web-ext-artifacts/` are
-gitignored) — they're reproducible with `npm run package`. To host downloadable
-builds on GitHub, attach the zips to a tagged Release:
+gitignored) — they're reproducible with `npm run package`.
+
+**Automated (recommended):** pushing a version tag triggers
+`.github/workflows/release.yml`, which builds + tests + packages both targets and
+publishes a GitHub Release with the zips attached (auto-generated notes):
+
+```bash
+# bump manifest version first, then:
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+**Manual** alternative — attach the zips to a Release yourself:
 
 **Web UI:** Repo → Releases → Draft a new release → create tag `v<version>` →
 drag in `web-ext-artifacts/browsersync-{chrome,firefox}-<version>.zip` → Publish.
