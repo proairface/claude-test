@@ -78,16 +78,32 @@ function makeDraggable(li, node, draggable) {
     e.dataTransfer.effectAllowed = "move";
   });
 }
-function makeDropTarget(el, getTarget) {
+// Place `id` immediately before `beforeId` in `parentId` (or at the end when
+// beforeId is null). Engine-agnostic: Chrome and Firefox disagree on the index
+// for a same-parent FORWARD move, so we never do one — we append to the
+// destination first (deterministic on both), then, if needed, do a BACKWARD
+// move to the slot before `beforeId` (also consistent on both). Re-reading the
+// children between steps keeps the target index correct.
+async function placeBefore(id, parentId, beforeId) {
+  if (id === beforeId) return;
+  await browser.bookmarks.move(id, { parentId }); // append to destination
+  if (beforeId) {
+    const kids = await browser.bookmarks.getChildren(parentId);
+    const idx = kids.findIndex((k) => k.id === beforeId);
+    if (idx >= 0) await browser.bookmarks.move(id, { parentId, index: idx });
+  }
+}
+
+function makeDropTarget(el, descriptorFn) {
   el.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
   el.addEventListener("drop", async (e) => {
     e.preventDefault();
     e.stopPropagation();
     const id = e.dataTransfer.getData("text/plain");
-    const dest = getTarget();
-    if (!id || !dest) return;
-    // move() throws if you try to drop a folder into itself/a descendant.
-    try { await browser.bookmarks.move(id, dest); } catch { /* invalid move */ }
+    const d = descriptorFn();
+    if (!id || !d) return;
+    // move() throws if you drop a folder into itself/a descendant — ignore.
+    try { await placeBefore(id, d.parentId, d.beforeId ?? null); } catch { /* invalid move */ }
     await refresh();
   });
 }
@@ -126,7 +142,7 @@ function bookmarkNode(node) {
   li.append(actionRow(node, { editable: true, isFolder: false }));
   makeDraggable(li, node, true);
   // Drop onto a bookmark => move as its sibling, just before it.
-  makeDropTarget(li, () => ({ parentId: node.parentId, index: node.index }));
+  makeDropTarget(li, () => ({ parentId: node.parentId, beforeId: node.id }));
   return li;
 }
 
@@ -145,8 +161,11 @@ function folderNode(node, topLevel) {
   li.append(actionRow(node, { editable: !topLevel, isFolder: true }));
   li.append(renderChildren(node.children ?? [], false));
   makeDraggable(li, node, !topLevel);
-  // Drop onto a folder label => move INTO this folder (append at end).
-  makeDropTarget(label, () => ({ parentId: node.id }));
+  // Drop onto the folder's label => move INTO this folder (append at end).
+  makeDropTarget(label, () => ({ parentId: node.id, beforeId: null }));
+  // Drop onto the folder row => reorder before this folder (not for protected
+  // top-level folders, whose parent is the root).
+  if (!topLevel) makeDropTarget(li, () => ({ parentId: node.parentId, beforeId: node.id }));
   return li;
 }
 
