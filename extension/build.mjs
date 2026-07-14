@@ -28,6 +28,7 @@ await build({
     "background/index": resolve(here, "src/background/index.js"),
     "options/options": resolve(here, "src/options/options.js"),
     "popup/popup": resolve(here, "src/popup/popup.js"),
+    "manager/manager": resolve(here, "src/manager/manager.js"),
   },
   outdir: dist,
   bundle: true,
@@ -39,6 +40,7 @@ await build({
 // Static assets + the target-specific manifest.
 await cp(resolve(here, "src/options/options.html"), resolve(dist, "options/options.html"));
 await cp(resolve(here, "src/popup/popup.html"), resolve(dist, "popup/popup.html"));
+await cp(resolve(here, "src/manager/manager.html"), resolve(dist, "manager/manager.html"));
 await cp(resolve(here, "icons"), resolve(dist, "icons"), { recursive: true });
 await copyFile(resolve(here, `manifest.${target}.json`), resolve(dist, "manifest.json"));
 

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BrowserSync — Bookmark manager</title>
+    <style>
+      body { font: 14px/1.6 system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+      h1 { font-size: 20px; }
+      .note { background: #eef6ff; border: 1px solid #9cc3ee; padding: .6rem .8rem; border-radius: 4px; color: #333; }
+      #search { width: 100%; box-sizing: border-box; padding: .5rem; margin: 1rem 0; }
+      ul { list-style: none; padding-left: 1.1rem; margin: .2rem 0; }
+      li { margin: .1rem 0; }
+      .folder > .label { cursor: pointer; font-weight: 600; }
+      .folder > .label::before { content: "▸ "; color: #888; }
+      .folder.open > .label::before { content: "▾ "; }
+      .folder:not(.open) > ul { display: none; }
+      a { color: #1a56c4; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .u { color: #999; font-size: 12px; margin-left: .4rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Bookmark manager</h1>
+    <p class="note">Read-only view for now — browse and open your synced bookmarks. Inline
+      rename / move / reorder / delete are the next step (Tier 2). Quick actions
+      (bookmark this page, edit, remove) live in the toolbar popup.</p>
+    <input id="search" type="search" placeholder="filter by title or URL…" autocomplete="off" />
+    <div id="tree"></div>
+    <script type="module" src="manager.js"></script>
+  </body>
+</html>
